@@ -24,7 +24,7 @@ public class Order
         if (ownerId ==  Guid.Empty) throw new ArgumentException("invalid owner ID", nameof(ownerId));
         ArgumentNullException.ThrowIfNull(instrument);
         
-        if (!Enum.IsDefined(type))  throw new ArgumentOutOfRangeException(nameof(type));
+        if (!Enum.IsDefined(type)) throw new ArgumentOutOfRangeException(nameof(type));
         if (!Enum.IsDefined(side)) throw new ArgumentOutOfRangeException(nameof(side));
         
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
