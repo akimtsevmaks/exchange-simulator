@@ -11,19 +11,24 @@ public class OrderBook
     }
     private sealed record OrderLocation(PriceLevel Level, LinkedListNode<Order> Node, OrderSide Side);
     
-    public Instrument Instrument { get; }
-    
     private readonly SortedDictionary<decimal, PriceLevel> _bids = 
         new(Comparer<decimal>.Create((a, b) => b.CompareTo(a)));
-
     private readonly SortedDictionary<decimal, PriceLevel> _asks = new();
+    
     private readonly Dictionary<Guid, OrderLocation> _ordersById = new();
+    
+    public Instrument Instrument { get; }
 
     public OrderBook(Instrument instrument)
     {
         ArgumentNullException.ThrowIfNull(instrument);
         
         Instrument = instrument;
+    }
+
+    public OrderProcessingResult ProcessOrder(Order order)
+    {
+        return null;
     }
     
     private void AddOrder(Order order)
