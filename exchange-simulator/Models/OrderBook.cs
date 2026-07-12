@@ -26,6 +26,27 @@ public class OrderBook
         Instrument = instrument;
     }
 
+    public OrderBookSnapshot GetSnapshot()
+    {
+        var bids = BuildLevels(_bids);
+        var asks = BuildLevels(_asks);
+        
+        return new OrderBookSnapshot(Instrument.Id, bids, asks);
+    }
+
+    private static IReadOnlyList<OrderBookLevel> BuildLevels(SortedDictionary<decimal, PriceLevel> levels)
+    {
+        var result = new List<OrderBookLevel>();
+
+        foreach (var level in levels.Values)
+        {
+            var totalSize = level.Orders.Sum(order => order.RemainingSize);
+            result.Add(new OrderBookLevel(level.Price, totalSize));
+        }
+        
+        return result.AsReadOnly();
+    }
+
     public OrderProcessingResult ProcessOrder(Order incomingOrder)
     {
         ArgumentNullException.ThrowIfNull(incomingOrder);
@@ -34,7 +55,7 @@ public class OrderBook
             throw new ArgumentException($"{incomingOrder.Instrument.Id} does not match {Instrument.Id}", nameof(incomingOrder));
         
         if (_ordersById.ContainsKey(incomingOrder.Id))
-            throw new ArgumentException($"{Instrument.Id} already exists", nameof(incomingOrder));
+            throw new ArgumentException($"{incomingOrder.Id} already exists", nameof(incomingOrder));
 
         var oppositeSideLevels = incomingOrder.Side == OrderSide.Buy ? _asks : _bids;
 
