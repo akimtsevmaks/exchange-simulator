@@ -52,7 +52,11 @@ public class OrderBook
         ArgumentNullException.ThrowIfNull(incomingOrder);
 
         if (incomingOrder.Instrument.Id != Instrument.Id)
-            throw new ArgumentException($"{incomingOrder.Instrument.Id} does not match {Instrument.Id}", nameof(incomingOrder));
+            throw new ArgumentException(
+                $"Instrument {incomingOrder.Instrument.Id} does not match {Instrument.Id}", nameof(incomingOrder));
+
+        if (incomingOrder.Status != OrderStatus.Created)
+            throw new ArgumentException($"{incomingOrder.Id} hasn't Created status", nameof(incomingOrder));
         
         if (_ordersById.ContainsKey(incomingOrder.Id))
             throw new ArgumentException($"{incomingOrder.Id} already exists", nameof(incomingOrder));
@@ -88,8 +92,10 @@ public class OrderBook
         if (isResting)
             AddOrder(incomingOrder);
         
+        if (incomingOrder.Type == OrderType.Market && incomingOrder.RemainingSize > 0)
+            incomingOrder.Cancel();
+        
         return new OrderProcessingResult(trades, incomingOrder.RemainingSize, isResting);
-
     }
 
     private static bool CanMatch(Order order, decimal restingPrice)
@@ -141,6 +147,7 @@ public class OrderBook
         var node = level.Orders.AddLast(order);
         
         _ordersById.Add(order.Id, new OrderLocation(level, node, order.Side));
+        order.Activate();
     }
 
     public bool CancelOrder(Guid orderId)
@@ -149,6 +156,7 @@ public class OrderBook
             return false;
 
         location.Level.Orders.Remove(location.Node);
+        location.Node.Value.Cancel();
 
         if (location.Level.Orders.Count != 0)
             return true;

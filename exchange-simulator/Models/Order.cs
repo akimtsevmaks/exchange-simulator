@@ -9,14 +9,16 @@ public class Order
     
     public OrderType Type { get; }
     public OrderSide Side { get; }
+    public OrderStatus Status { get; private set; } = OrderStatus.Created;
     
     public Guid OwnerId { get; }
     public Instrument Instrument { get; }
     
-    
     public decimal? Price { get; }
     public decimal Size { get; }
     public decimal RemainingSize { get; private set; }
+    public decimal FilledSize => Size - RemainingSize;
+    
 
     public Order(Guid ownerId, OrderType type, OrderSide side, Instrument instrument,
         decimal size, decimal? price = null)
@@ -49,11 +51,33 @@ public class Order
         Price = price;
     }
 
-    public void Fill(decimal size)
+    internal void Fill(decimal size)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
+        if (Status != OrderStatus.Created && Status != OrderStatus.Active)
+            throw new InvalidOperationException($"Order in status {Status} cannot be filled.");
         if (size > RemainingSize) throw new ArgumentException("invalid size ( >remaining )", nameof(size));
         
         RemainingSize -= size;
+
+        if (RemainingSize == 0)
+            Status = OrderStatus.Filled;
+
+    }
+
+    internal void Activate()
+    {
+        if (Status != OrderStatus.Created)
+            throw new InvalidOperationException("invalid order status");
+        
+        Status = OrderStatus.Active;
+    }
+
+    internal void Cancel()
+    {
+        if (Status != OrderStatus.Created && Status != OrderStatus.Active)
+            throw new InvalidOperationException("invalid order status");
+        
+        Status = OrderStatus.Cancelled;
     }
 }
