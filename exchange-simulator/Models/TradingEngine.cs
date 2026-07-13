@@ -49,6 +49,26 @@ public class TradingEngine
         return new OrderCommandResult(true, null, order.GetSnapshot(), []);
     }
 
+    public bool TryGetOrder(Guid orderId, out OrderSnapshot? snapshot)
+    {
+        if (!_orders.TryGetValue(orderId, out var order))
+        {
+            snapshot = null;
+            return false;
+        }
+        
+        snapshot = order.GetSnapshot();
+        return true;
+    }
+    
+    public IReadOnlyList<Trade> GetTrades() => _trades.ToArray();
+    
+    public OrderBookSnapshot GetOrderBookSnapshot() => _orderBook.GetSnapshot();
+    
+    public IReadOnlyList<OrderSnapshot> GetActiveOrders() => _orders.Values
+        .Where(order => order.Status == OrderStatus.Active)
+            .Select(order => order.GetSnapshot()).ToArray();
+
     private bool ValidateOrderRequest(PlaceOrderCommand command, out OrderRejectionReason? reason)
     {
         if (command.OwnerId == Guid.Empty)
