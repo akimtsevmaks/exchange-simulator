@@ -61,13 +61,21 @@ public class TradingEngine
         return true;
     }
     
-    public IReadOnlyList<Trade> GetTrades() => _trades.ToArray();
+    public IReadOnlyList<Trade> GetTrades() => 
+        _trades.ToArray();
     
-    public OrderBookSnapshot GetOrderBookSnapshot() => _orderBook.GetSnapshot();
+    public OrderBookSnapshot GetOrderBookSnapshot() =>
+        _orderBook.GetSnapshot();
     
-    public IReadOnlyList<OrderSnapshot> GetActiveOrders() => _orders.Values
-        .Where(order => order.Status == OrderStatus.Active)
+    public IReadOnlyList<OrderSnapshot> GetActiveOrders() =>
+        _orders.Values.Where(order => order.Status == OrderStatus.Active)
             .Select(order => order.GetSnapshot()).ToArray();
+
+    private decimal? GetLastTradePrice() =>
+        _trades.Count == 0 ? null : _trades[^1].Price;
+    
+    public decimal GetReferencePrice() => 
+        GetLastTradePrice() ?? Instrument.InitialPrice;
 
     private bool ValidateOrderRequest(PlaceOrderCommand command, out OrderRejectionReason? reason)
     {
