@@ -15,13 +15,13 @@ public class Order
     public Instrument Instrument { get; }
     
     public decimal? Price { get; }
-    public decimal Size { get; }
-    public decimal RemainingSize { get; private set; }
-    public decimal FilledSize => Size - RemainingSize;
+    public long Size { get; }
+    public long RemainingSize { get; private set; }
+    public long FilledSize => Size - RemainingSize;
     
 
     public Order(Guid ownerId, OrderType type, OrderSide side, Instrument instrument,
-        decimal size, decimal? price = null)
+        long size, decimal? price = null)
     {
         if (ownerId ==  Guid.Empty) throw new ArgumentException("invalid owner ID", nameof(ownerId));
         ArgumentNullException.ThrowIfNull(instrument);
@@ -40,6 +40,9 @@ public class Order
         if (type == OrderType.Market && price.HasValue)
             throw new ArgumentException("invalid price in market", nameof(price));
         
+        if (size % instrument.LotSize != 0)
+            throw new ArgumentException("quantity must be divisible by lot", nameof(size));
+        
         Type = type;
         Side = side;
         
@@ -51,7 +54,7 @@ public class Order
         Price = price;
     }
 
-    internal void Fill(decimal size)
+    internal void Fill(long size)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
         if (Status != OrderStatus.Created && Status != OrderStatus.Active)

@@ -7,7 +7,7 @@ public sealed record Trade(
     Guid SellOrderId,
     
     decimal Price,
-    decimal Size,
+    long Size,
     DateTimeOffset ExecutedAt
     
     );

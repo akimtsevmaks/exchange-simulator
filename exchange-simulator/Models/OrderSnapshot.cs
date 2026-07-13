@@ -12,9 +12,9 @@ public record OrderSnapshot(
     OrderStatus OrderStatus,
     
     decimal? Price,
-    decimal Size,
-    decimal RemainingSize,
-    decimal FilledSize,
+    long Size,
+    long RemainingSize,
+    long FilledSize,
     
     DateTimeOffset CreatedAt
     

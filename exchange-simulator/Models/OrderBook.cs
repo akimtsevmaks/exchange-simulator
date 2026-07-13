@@ -107,7 +107,7 @@ public class OrderBook
         return order.Side == OrderSide.Buy ? limitPrice >= restingPrice : limitPrice <= restingPrice;
     }
 
-    private Trade CreateTrade(Order incomingOrder, Order restingOrder, decimal price, decimal size)
+    private Trade CreateTrade(Order incomingOrder, Order restingOrder, decimal price, long size)
     {
         var buyOrderId = incomingOrder.Side == OrderSide.Buy ? incomingOrder.Id : restingOrder.Id;
         var sellOrderId = incomingOrder.Side == OrderSide.Sell ? incomingOrder.Id : restingOrder.Id;

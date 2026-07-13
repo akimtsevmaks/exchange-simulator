@@ -6,7 +6,7 @@ public record PlaceOrderCommand(
     Guid OwnerId,
     OrderSide Side,
     OrderType Type,
-    decimal Size,
+    long Size,
     decimal? Price
     
     );

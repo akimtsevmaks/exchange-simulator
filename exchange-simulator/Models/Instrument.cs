@@ -7,10 +7,10 @@ public sealed class Instrument
     public string Name { get; } 
 
     
-    public decimal LotSize { get; }
+    public long LotSize { get; }
     public decimal InitPrice { get; }
 
-    public Instrument(Guid id, string ticker, string name, decimal lotSize, decimal initPrice)
+    public Instrument(Guid id, string ticker, string name, long lotSize, decimal initPrice)
     {
         if (id == Guid.Empty) throw new ArgumentException("invalid id", nameof(id));
         ArgumentException.ThrowIfNullOrEmpty(ticker);

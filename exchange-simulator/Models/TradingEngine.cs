@@ -95,6 +95,12 @@ public class TradingEngine
             return false;
         }
 
+        if (command.Size % Instrument.LotSize != 0)
+        {
+            reason = OrderRejectionReason.QuantityNotMultipleOfLotSize;
+            return false;
+        }
+
         if (command.Type == OrderType.Limit && command.Price == null)
         {
             reason = OrderRejectionReason.PriceRequiredForLimitOrder;
