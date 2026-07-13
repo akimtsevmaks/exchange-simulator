@@ -80,4 +80,10 @@ public class Order
         
         Status = OrderStatus.Cancelled;
     }
+    
+    public OrderSnapshot GetSnapshot()
+    {
+        return new OrderSnapshot(Id, OwnerId, Instrument.Id, 
+            Type, Side, Status, Price, Size, RemainingSize, FilledSize, Time);
+    }
 }
