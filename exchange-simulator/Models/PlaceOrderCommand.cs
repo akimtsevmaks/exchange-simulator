@@ -7,6 +7,6 @@ public record PlaceOrderCommand(
     OrderSide Side,
     OrderType Type,
     long Size,
-    decimal? Price
+    decimal? Price = null
     
     );

@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator", "exchange-simulator\exchange-simulator.csproj", "{D0246A9E-80EA-4EE5-B4BF-58628F9E8635}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator.Tests", "exchange-simulator.Tests\exchange-simulator.Tests.csproj", "{8BB6C2D5-369D-4E2B-971F-81DAD535E2C9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{D0246A9E-80EA-4EE5-B4BF-58628F9E8635}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D0246A9E-80EA-4EE5-B4BF-58628F9E8635}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D0246A9E-80EA-4EE5-B4BF-58628F9E8635}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BB6C2D5-369D-4E2B-971F-81DAD535E2C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BB6C2D5-369D-4E2B-971F-81DAD535E2C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BB6C2D5-369D-4E2B-971F-81DAD535E2C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BB6C2D5-369D-4E2B-971F-81DAD535E2C9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

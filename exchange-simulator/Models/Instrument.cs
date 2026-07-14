@@ -16,6 +16,11 @@ public sealed class Instrument
         ArgumentException.ThrowIfNullOrEmpty(ticker);
         ArgumentException.ThrowIfNullOrEmpty(name);
         
+        if (ticker.Length != 4)
+            throw new ArgumentException("Ticker must contain exactly 4 characters.", nameof(ticker));
+        if (name.Length > 99)
+            throw new ArgumentException("Name cannot exceed 99 characters.", nameof(name));
+        
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(lotSize);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialPrice);
         
