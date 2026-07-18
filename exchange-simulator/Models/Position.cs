@@ -21,6 +21,27 @@ public sealed class Position
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
         Quantity = checked(Quantity + quantity);
     }
+
+    internal bool TryReserve(long quantity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+
+        if (quantity > AvailableQuantity)
+            return false;
+        
+        ReservedQuantity += quantity;
+        return true;
+    }
+
+    internal void Release(long quantity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+        
+        if (quantity > ReservedQuantity)
+            throw new InvalidOperationException("Can't release more than reserved quantity");
+        
+        ReservedQuantity -= quantity;
+    }
     
     public PositionSnapshot GetSnapshot() =>
         new(InstrumentId, Quantity, ReservedQuantity, AvailableQuantity);

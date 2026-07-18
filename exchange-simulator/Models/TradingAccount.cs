@@ -62,6 +62,33 @@ public class TradingAccount
         
         return operation;
     }
+
+    public bool TryReserveCash(decimal amount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
+
+        if (amount > AvailableCash)
+            return false;
+        
+        ReservedCash += amount;
+        return true;
+    }
+
+    public void ReleaseCash(decimal amount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
+        
+        if (amount > ReservedCash)
+            throw new InvalidOperationException("Can't release more than reserved quantity");
+        
+        ReservedCash -= amount;
+    }
+    
+    public bool TryReserveInstruments(long quantity) =>
+        Position.TryReserve(quantity);
+    
+    public void ReleaseInstruments(long quantity) =>
+         Position.Release(quantity);
     
     public IReadOnlyList<AccountOperation> GetOperations() =>
         _operations.ToArray();
