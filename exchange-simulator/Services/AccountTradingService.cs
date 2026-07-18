@@ -31,6 +31,32 @@ public sealed class AccountTradingService
     public AccountOperation GrantInitialInstrument(Guid accountId, long quantity) =>
         GetAccount(accountId).GrantInitialInstruments(quantity);
 
+    public MarketBuyQuote GetMarketBuyQuote(long requestedSize)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(requestedSize);
+        
+        if (requestedSize % Instrument.LotSize != 0)
+            throw new ArgumentException("Quantity must be a multiple of lot size");
+
+        var remainingSize = requestedSize;
+        var executableSize = 0L;
+        var cost = 0m;
+
+        foreach (var level in _tradingEngine.GetOrderBookSnapshot().Asks)
+        {
+            if (remainingSize == 0)
+                break;
+            
+            var sizeAtLevel = Math.Min(remainingSize, level.Size);
+
+            executableSize += sizeAtLevel;
+            remainingSize -= sizeAtLevel;
+            cost = checked(cost + level.Price * sizeAtLevel);
+        }
+        
+        return new MarketBuyQuote(requestedSize, executableSize, remainingSize, cost);
+    }
+    
     public bool TryGetAccount(Guid accountId, out TradingAccountSnapshot? snapshot)
     {
         if (!_accounts.TryGetValue(accountId, out var account))
