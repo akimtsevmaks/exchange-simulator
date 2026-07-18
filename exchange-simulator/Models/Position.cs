@@ -15,6 +15,12 @@ public sealed class Position
         
         InstrumentId = instrumentId;
     }
+
+    internal void GrantInitialQuantity(long quantity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+        Quantity = checked(Quantity + quantity);
+    }
     
     public PositionSnapshot GetSnapshot() =>
         new(InstrumentId, Quantity, ReservedQuantity, AvailableQuantity);
