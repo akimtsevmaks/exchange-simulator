@@ -101,6 +101,37 @@ public sealed class AccountTradingService
         ReleaseUnusedMarketReservation(account, command, result, reservedCash, reservedInstruments);
         return result;
     }
+
+    public OrderCommandResult CancelOrder(Guid orderId)
+    {
+        if (!_tradingEngine.TryGetOrder(orderId, out var order))
+            return RejectOrder(OrderRejectionReason.OrderNotFound);
+        
+        if (!_accounts.TryGetValue(order!.OwnerId, out var account))
+            return RejectOrder(OrderRejectionReason.AccountNotFound);
+        
+        var result = _tradingEngine.CancelOrder(orderId);
+
+        if (!result.IsSuccess)
+            return result;
+
+        var cancelledOrder = result.Order ??
+                             throw new InvalidOperationException("Successful cancellation must return an order");
+
+        if (cancelledOrder.OrderSide == OrderSide.Buy)
+        {
+            var price = cancelledOrder.Price ??
+                        throw new InvalidOperationException("Active buy order must have a limit price");
+            var cashToRelease = checked(price * cancelledOrder.RemainingSize);
+            account.ReleaseCash(cashToRelease);
+        }
+        else
+        {
+            account.ReleaseInstruments(cancelledOrder.RemainingSize);
+        }
+
+        return result;
+    }
     
     public bool TryGetAccount(Guid accountId, out TradingAccountSnapshot? snapshot)
     {
