@@ -5,6 +5,7 @@ public sealed record PositionSnapshot(
     
     long Quantity,
     long ReservedQuantity,
-    long AvailableQuantity
+    long AvailableQuantity,
+    decimal AveragePrice
     
     );

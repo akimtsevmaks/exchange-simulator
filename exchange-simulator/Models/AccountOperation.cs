@@ -5,10 +5,12 @@ namespace exchange_simulator.Models;
 public record AccountOperation(
     Guid Id,
     Guid AccountId,
-    AccountOperationType OperationType,
-    decimal CashAmount,
+    AccountOperationType Type,
+    decimal CashChange,
     Guid? InstrumentId,
-    long InstrumentQuantity,
+    long InstrumentQuantityChange,
+    Guid? OrderId,
+    Guid? TradeId,
     DateTimeOffset CreatedAt
     
     );

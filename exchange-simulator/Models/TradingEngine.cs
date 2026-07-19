@@ -77,7 +77,7 @@ public class TradingEngine
     public decimal GetReferencePrice() => 
         GetLastTradePrice() ?? Instrument.InitialPrice;
 
-    private bool ValidateOrderRequest(PlaceOrderCommand command, out OrderRejectionReason? reason)
+    internal bool ValidateOrderRequest(PlaceOrderCommand command, out OrderRejectionReason? reason)
     {
         if (command.OwnerId == Guid.Empty)
         {

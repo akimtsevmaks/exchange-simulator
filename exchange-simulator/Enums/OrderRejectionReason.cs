@@ -10,6 +10,9 @@ public enum OrderRejectionReason
     InvalidPrice,
     PriceRequiredForLimitOrder,
     PriceNotAllowedForMarketOrder,
+    AccountNotFound,
+    InsufficientAvailableCash,
+    InsufficientAvailablePosition,
     OrderNotFound,
     OrderNotActive
 }
