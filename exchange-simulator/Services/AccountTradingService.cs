@@ -7,6 +7,7 @@ public sealed class AccountTradingService
 {
     private readonly TradingEngine _tradingEngine;
     private readonly Dictionary<Guid, TradingAccount> _accounts = [];
+    private readonly Dictionary<Guid, List<OrderHistoryEntry>> _orderHistory = [];
     
     public Instrument Instrument => _tradingEngine.Instrument;
 
@@ -99,6 +100,7 @@ public sealed class AccountTradingService
             SettleTrade(trade);
 
         ReleaseUnusedMarketReservation(account, command, result, reservedCash, reservedInstruments);
+        RecordPlacementHistory(result);
         return result;
     }
 
@@ -130,6 +132,7 @@ public sealed class AccountTradingService
             account.ReleaseInstruments(cancelledOrder.RemainingSize);
         }
 
+        RecordCancellationHistory(cancelledOrder);
         return result;
     }
     
@@ -147,6 +150,14 @@ public sealed class AccountTradingService
 
     public IReadOnlyList<AccountOperation> GetAccountOperations(Guid accountId) =>
         GetAccount(accountId).GetOperations();
+
+    public IReadOnlyList<OrderHistoryEntry> GetOrderHistory(Guid orderId)
+    {
+        if (!_orderHistory.TryGetValue(orderId, out var history))
+            throw new KeyNotFoundException($"Order history for {orderId} eas not found");
+        
+        return history.ToArray();
+    }
 
     private TradingAccount GetAccount(Guid accountId)
     {
@@ -218,4 +229,106 @@ public sealed class AccountTradingService
 
     private static OrderCommandResult RejectOrder(OrderRejectionReason reason) =>
         new(false, reason, null, []);
+
+    private void RecordPlacementHistory(OrderCommandResult result)
+    {
+        var order = result.Order ??
+                    throw new InvalidOperationException("Successful placement must return an order");
+        
+        _orderHistory.Add(order.Id,
+            [
+            new OrderHistoryEntry(
+                order.Id,
+                OrderHistoryEventType.Accepted,
+                0,
+                order.Size,
+                null,
+                order.CreatedAt)
+            ]);
+
+        foreach (var trade in result.Trades)
+        {
+            RecordTradeHistory(trade.BuyOrderId, trade);
+            RecordTradeHistory(trade.SellOrderId, trade);
+        }
+
+        if (order.OrderStatus == OrderStatus.Active)
+        {
+            AddHistoryEntry(
+                order.Id,
+                OrderHistoryEventType.Accepted,
+                order.FilledSize,
+                order.RemainingSize,
+                null,
+                DateTimeOffset.UtcNow);
+        }
+        else if (order.OrderStatus == OrderStatus.Cancelled)
+        {
+            AddHistoryEntry(
+                order.Id,
+                OrderHistoryEventType.Cancelled,
+                order.FilledSize,
+                order.RemainingSize,
+                null,
+                DateTimeOffset.UtcNow);
+        }
+    }
+
+    private void RecordTradeHistory(Guid orderId, Trade trade)
+    {
+        var order = GetOrder(orderId);
+        var history = GetOrderHistory(orderId);
+        var filledSize = checked(history[^1].FilledSize + trade.Size);
+
+        if (filledSize > order.Size)
+            throw new InvalidOperationException($"Trade overfills order {orderId} history");
+
+        var remainingSize = order.Size - filledSize;
+        var eventType = remainingSize == 0
+            ? OrderHistoryEventType.Filled
+            : OrderHistoryEventType.PartiallyFilled;
+
+        AddHistoryEntry(
+            orderId,
+            eventType,
+            filledSize,
+            remainingSize,
+            trade.Id,
+            trade.ExecutedAt);
+    }
+    
+    private void RecordCancellationHistory(OrderSnapshot order) =>
+        AddHistoryEntry(
+            order.Id,
+            OrderHistoryEventType.Cancelled,
+            order.FilledSize,
+            order.RemainingSize,
+            null,
+            DateTimeOffset.UtcNow);
+
+    private void AddHistoryEntry(
+        Guid orderId,
+        OrderHistoryEventType eventType,
+        long filledSize,
+        long remainingSize,
+        Guid? tradeId,
+        DateTimeOffset occurredAt)
+    {
+        GetHistory(orderId).Add(new OrderHistoryEntry(
+            orderId,
+            eventType,
+            filledSize,
+            remainingSize,
+            tradeId,
+            occurredAt));
+    }
+
+    private List<OrderHistoryEntry> GetHistory(Guid orderId)
+    {
+        if (!_orderHistory.TryGetValue(orderId, out var history))
+            throw new InvalidOperationException($"Order history for {orderId} does not exist");
+        
+        return history;
+    }
+
 }
