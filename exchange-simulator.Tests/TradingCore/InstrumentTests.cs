@@ -1,6 +1,6 @@
 using exchange_simulator.Models;
 
-namespace exchange_simulator.Tests;
+namespace exchange_simulator.Tests.TradingCore;
 
 public class InstrumentTests
 {
