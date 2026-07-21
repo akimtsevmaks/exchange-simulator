@@ -11,10 +11,10 @@ public sealed class AccountTradingService
     
     public Instrument Instrument => _tradingEngine.Instrument;
 
-    public AccountTradingService(TradingEngine tradingEngine)
+    public AccountTradingService(Instrument instrument)
     {
-        ArgumentNullException.ThrowIfNull(tradingEngine);
-        _tradingEngine = tradingEngine;
+        ArgumentNullException.ThrowIfNull(instrument);
+        _tradingEngine = new TradingEngine(instrument);
     }
 
     public TradingAccountSnapshot RegisterAccount(Guid accountId)
