@@ -1,4 +1,4 @@
-namespace exchange_simulator.Models;
+namespace exchange_simulator.Models.AccountTrading;
 
 public sealed class Position
 {

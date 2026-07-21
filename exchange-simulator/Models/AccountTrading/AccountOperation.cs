@@ -1,6 +1,6 @@
 using exchange_simulator.Enums;
 
-namespace exchange_simulator.Models;
+namespace exchange_simulator.Models.AccountTrading;
 
 public record AccountOperation(
     Guid Id,

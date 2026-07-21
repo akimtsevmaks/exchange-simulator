@@ -1,5 +1,6 @@
 using exchange_simulator.Enums;
 using exchange_simulator.Models;
+using exchange_simulator.Models.AccountTrading;
 
 namespace exchange_simulator.Tests.AccountTrading;
 

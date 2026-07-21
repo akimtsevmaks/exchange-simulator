@@ -1,6 +1,7 @@
 using exchange_simulator.Enums;
+using exchange_simulator.Models.TradingCore;
 
-namespace exchange_simulator.Models;
+namespace exchange_simulator.Models.AccountTrading;
 
 public class TradingAccount
 {
