@@ -55,7 +55,7 @@ public class TradingAccount
         var operation = new AccountOperation(
             Guid.NewGuid(),
             Id,
-            AccountOperationType.InitialInstrumentGranted,
+            AccountOperationType.InitialInstrumentsGranted,
             0,
             Position.InstrumentId,
             quantity,

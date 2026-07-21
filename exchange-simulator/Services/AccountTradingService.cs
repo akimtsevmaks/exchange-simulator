@@ -30,7 +30,7 @@ public sealed class AccountTradingService
     public AccountOperation GrantInitialCash(Guid accountId, decimal amount) =>
         GetAccount(accountId).GrantInitialCash(amount);
     
-    public AccountOperation GrantInitialInstrument(Guid accountId, long quantity) =>
+    public AccountOperation GrantInitialInstruments(Guid accountId, long quantity) =>
         GetAccount(accountId).GrantInitialInstruments(quantity);
 
     public MarketBuyQuote GetMarketBuyQuote(long requestedSize)

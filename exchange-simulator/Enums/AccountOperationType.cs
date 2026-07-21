@@ -3,7 +3,7 @@ namespace exchange_simulator.Enums;
 public enum AccountOperationType
 {
     InitialCashGranted,
-    InitialInstrumentGranted,
+    InitialInstrumentsGranted,
     TradeBuy,
     TradeSell
 }
