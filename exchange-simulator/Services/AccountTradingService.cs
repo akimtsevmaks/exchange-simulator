@@ -151,6 +151,34 @@ public sealed class AccountTradingService
     public IReadOnlyList<AccountOperation> GetAccountOperations(Guid accountId) =>
         GetAccount(accountId).GetOperations();
 
+    public IReadOnlyList<OrderSnapshot> GetActiveOrders(Guid accountId)
+    {
+        GetAccount(accountId);
+        
+        return _tradingEngine.GetActiveOrders()
+            .Where(order => order.OwnerId == accountId).ToArray();
+    }
+
+    public IReadOnlyList<OrderHistoryEntry> GetAccountOrderHistory(Guid accountId)
+    {
+        GetAccount(accountId);
+
+        return _orderHistory
+            .Where(item => GetOrder(item.Key).OwnerId == accountId)
+            .SelectMany(item => item.Value)
+            .OrderBy(entry => entry.OccurredAt).ToArray();
+    }
+
+    public IReadOnlyList<Trade> GetAccountTrades(Guid accountId)
+    {
+        GetAccount(accountId);
+        
+        return _tradingEngine.GetTrades()
+            .Where(trade =>
+                GetOrder(trade.BuyOrderId).OwnerId == accountId ||
+                GetOrder(trade.SellOrderId).OwnerId == accountId).ToArray();
+    }
+
     public IReadOnlyList<OrderHistoryEntry> GetOrderHistory(Guid orderId)
     {
         if (!_orderHistory.TryGetValue(orderId, out var history))
