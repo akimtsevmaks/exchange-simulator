@@ -284,7 +284,7 @@ public sealed class AccountTradingService
         {
             AddHistoryEntry(
                 order.Id,
-                OrderHistoryEventType.Accepted,
+                OrderHistoryEventType.Activated,
                 order.FilledSize,
                 order.RemainingSize,
                 null,
