@@ -34,6 +34,30 @@ public sealed class AccountTradingService
     
     public AccountOperation GrantInitialInstruments(Guid accountId, long quantity) =>
         GetAccount(accountId).GrantInitialInstruments(quantity);
+    
+    public OrderBookSnapshot GetOrderBookSnapshot() =>
+        _tradingEngine.GetOrderBookSnapshot();
+    
+    public decimal GetReferencePrice() =>
+        _tradingEngine.GetReferencePrice();
+    
+    public IReadOnlyList<Trade> GetTrades() =>
+        _tradingEngine.GetTrades();
+
+    public bool TryGetOrder(Guid accountId, Guid orderId, out OrderSnapshot? snapshot)
+    {
+        GetAccount(accountId);
+
+        if (!_tradingEngine.TryGetOrder(orderId, out var order) ||
+            order!.OwnerId != accountId)
+        {
+            snapshot = null;
+            return false;
+        }
+
+        snapshot = order;
+        return true;
+    }
 
     public MarketBuyQuote GetMarketBuyQuote(long requestedSize)
     {
