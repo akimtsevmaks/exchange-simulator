@@ -9,11 +9,22 @@ public sealed class LocalMarket
     private readonly AccountTradingService _accountTradingService;
     
     public Instrument Instrument => _accountTradingService.Instrument;
+    
+    public Guid MarketMakerAccountId { get; }
+    public Guid NoiseBotAccountId { get; }
+    public Guid ManualAccountId { get; }
 
-    public LocalMarket(Instrument instrument)
+    public LocalMarket(Instrument instrument, decimal initialCashPerAccount, long initialInstrumentPeerAccount)
     {
         ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCashPerAccount);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentPeerAccount);
+        
         _accountTradingService = new AccountTradingService(instrument);
+
+        MarketMakerAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
+        NoiseBotAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
+        ManualAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
     }
     
     public TradingAccountSnapshot RegisterAccount(Guid accountId) =>
@@ -74,6 +85,17 @@ public sealed class LocalMarket
     public IReadOnlyList<OrderHistoryEntry> GetOrderHistory(Guid orderId) =>
         Execute(() => _accountTradingService.GetOrderHistory(orderId));
 
+
+    private Guid RegisterParticipant(decimal initialCash, long initialInstrument)
+    {
+        var accountId = Guid.NewGuid();
+        
+        _accountTradingService.RegisterAccount(accountId);
+        _accountTradingService.GrantInitialCash(accountId, initialCash);
+        _accountTradingService.GrantInitialInstruments(accountId, initialInstrument);
+        
+        return accountId;
+    }
 
     private T Execute<T>(Func<T> func)
     {
