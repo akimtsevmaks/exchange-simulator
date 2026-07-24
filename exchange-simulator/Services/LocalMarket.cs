@@ -1,3 +1,5 @@
+using exchange_simulator.Bots;
+using exchange_simulator.Enums;
 using exchange_simulator.Models.AccountTrading;
 using exchange_simulator.Models.TradingCore;
 
@@ -7,25 +9,117 @@ public sealed class LocalMarket
 {
     private readonly object _syncRoot = new();
     private readonly AccountTradingService _accountTradingService;
+    private readonly IReadOnlyList<ITradingBot> _bots;
+    private readonly Dictionary<Guid, BotExecutionFailure> _botFailures = [];
+    private CancellationTokenSource? _runCancellation;
+    private Task? _runTask;
+    private LocalMarketStatus _status;
     
     public Instrument Instrument => _accountTradingService.Instrument;
     
     public Guid MarketMakerAccountId { get; }
     public Guid NoiseBotAccountId { get; }
     public Guid ManualAccountId { get; }
+    public TimeSpan StepInterval { get; }
+    public LocalMarketStatus Status => Execute(() => _status);
 
-    public LocalMarket(Instrument instrument, decimal initialCashPerAccount, long initialInstrumentPeerAccount)
+    public LocalMarket(
+        Instrument instrument,
+        decimal initialCashPerAccount,
+        long initialInstrumentPeerAccount,
+        TimeSpan stepInterval,
+        MarketMakerBotOptions marketMakerOptions,
+        NoiseBotOptions noiseBotOptions)
     {
         ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentNullException.ThrowIfNull(marketMakerOptions);
+        ArgumentNullException.ThrowIfNull(noiseBotOptions);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCashPerAccount);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentPeerAccount);
+        
+        if (stepInterval <= TimeSpan.Zero || 
+            stepInterval.TotalMilliseconds > uint.MaxValue - 1)
+            throw new ArgumentOutOfRangeException(nameof(stepInterval),
+                "Step interval is outside the supported range");
         
         _accountTradingService = new AccountTradingService(instrument);
 
         MarketMakerAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
         NoiseBotAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
         ManualAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
+        
+        StepInterval = stepInterval;
+        _bots =
+        [
+            new MarketMakerBot(
+                this,
+                marketMakerOptions.QuoteOffset,
+                marketMakerOptions.OrderSize),
+            new NoiseBot(
+                this,
+                noiseBotOptions.RandomSeed,
+                noiseBotOptions.PriceOffset,
+                noiseBotOptions.MaxOrderLots,
+                noiseBotOptions.MaxActiveOrders)
+        ];
     }
+
+    public void Step()
+    {
+        lock (_syncRoot)
+        {
+            if (_status == LocalMarketStatus.Stopped)
+                throw new InvalidOperationException(
+                    "A stopped local market cannot execute new steps");
+
+            foreach (var bot in _bots)
+                ExecuteBotStep(bot);
+        }
+    }
+    
+    public Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_syncRoot)
+        {
+            if (_status != LocalMarketStatus.Created)
+            {
+                throw new InvalidOperationException(
+                    "A local market can be started only once");
+            }
+
+            _runCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _status = LocalMarketStatus.Running;
+            _runTask = RunLoopAsync(_runCancellation.Token);
+        }
+
+        return Task.CompletedTask;
+    }
+    
+    public async Task StopAsync()
+    {
+        CancellationTokenSource? runCancellation;
+        Task? runTask;
+
+        lock (_syncRoot)
+        {
+            if (_status == LocalMarketStatus.Created)
+            {
+                StopBots();
+                _status = LocalMarketStatus.Stopped;
+                return;
+            }
+
+            runCancellation = _runCancellation;
+            runTask = _runTask;
+        }
+
+        runCancellation?.Cancel();
+
+        if (runTask is not null)
+            await runTask;
+    }
+
     
     public TradingAccountSnapshot RegisterAccount(Guid accountId) =>
         Execute(() => _accountTradingService.RegisterAccount(accountId));
@@ -84,7 +178,75 @@ public sealed class LocalMarket
 
     public IReadOnlyList<OrderHistoryEntry> GetOrderHistory(Guid orderId) =>
         Execute(() => _accountTradingService.GetOrderHistory(orderId));
+    
+    public IReadOnlyList<BotExecutionFailure> GetBotFailures() =>
+        Execute(() => _bots
+            .Where(bot => _botFailures.ContainsKey(bot.AccountId))
+            .Select(bot => _botFailures[bot.AccountId])
+            .ToArray());
+    
+    private async Task RunLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(StepInterval);
 
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+                Step();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            lock (_syncRoot)
+            {
+                StopBots();
+                _status = LocalMarketStatus.Stopped;
+            }
+        }
+    }
+    
+    private void ExecuteBotStep(ITradingBot bot)
+    {
+        try
+        {
+            bot.ExecuteStep();
+            _botFailures.Remove(bot.AccountId);
+        }
+        catch (Exception exception)
+        {
+            RecordBotFailure(bot, "Step", exception);
+        }
+    }
+
+    private void StopBots()
+    {
+        foreach (var bot in _bots)
+        {
+            try
+            {
+                bot.Stop();
+            }
+            catch (Exception exception)
+            {
+                RecordBotFailure(bot, "Stop", exception);
+            }
+        }
+    }
+
+    private void RecordBotFailure(
+        ITradingBot bot,
+        string operation,
+        Exception exception)
+    {
+        _botFailures[bot.AccountId] = new BotExecutionFailure(
+            bot.AccountId,
+            operation,
+            exception.GetType().Name,
+            exception.Message,
+            DateTimeOffset.UtcNow);
+    }
 
     private Guid RegisterParticipant(decimal initialCash, long initialInstrument)
     {
