@@ -11,6 +11,7 @@ public sealed class LocalMarket
     private readonly AccountTradingService _accountTradingService;
     private readonly IReadOnlyList<ITradingBot> _bots;
     private readonly Dictionary<Guid, BotExecutionFailure> _botFailures = [];
+    private readonly HashSet<Guid> _stoppedBotAccountIds = [];
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private LocalMarketStatus _status;
@@ -73,7 +74,10 @@ public sealed class LocalMarket
                     "A stopped local market cannot execute new steps");
 
             foreach (var bot in _bots)
-                ExecuteBotStep(bot);
+            {
+                if (!_stoppedBotAccountIds.Contains(bot.AccountId))
+                    ExecuteBotStep(bot);
+            }
         }
     }
     
@@ -185,6 +189,16 @@ public sealed class LocalMarket
             .Select(bot => _botFailures[bot.AccountId])
             .ToArray());
     
+    public bool TryStopBot(Guid botAccountId)
+    {
+        lock (_syncRoot)
+        {
+            var bot = _bots.FirstOrDefault(bot => bot.AccountId == botAccountId);
+
+            return bot is not null && StopBot(bot);
+        }
+    }
+    
     private async Task RunLoopAsync(CancellationToken cancellationToken)
     {
         try
@@ -212,7 +226,7 @@ public sealed class LocalMarket
         try
         {
             bot.ExecuteStep();
-            _botFailures.Remove(bot.AccountId);
+            ClearBotFailure(bot, "Step");
         }
         catch (Exception exception)
         {
@@ -223,15 +237,31 @@ public sealed class LocalMarket
     private void StopBots()
     {
         foreach (var bot in _bots)
+            StopBot(bot);
+    }
+    
+    private bool StopBot(ITradingBot bot)
+    {
+        try
         {
-            try
-            {
-                bot.Stop();
-            }
-            catch (Exception exception)
-            {
-                RecordBotFailure(bot, "Stop", exception);
-            }
+            bot.Stop();
+            _stoppedBotAccountIds.Add(bot.AccountId);
+            ClearBotFailure(bot, "Stop");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            RecordBotFailure(bot, "Stop", exception);
+            return false;
+        }
+    }
+    
+    private void ClearBotFailure(ITradingBot bot, string operation)
+    {
+        if (_botFailures.TryGetValue(bot.AccountId, out var failure) &&
+            failure.Operation == operation)
+        {
+            _botFailures.Remove(bot.AccountId);
         }
     }
 

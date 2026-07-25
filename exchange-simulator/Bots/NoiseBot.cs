@@ -79,9 +79,6 @@ public sealed class NoiseBot : ITradingBot
     
     public void Stop()
     {
-        if (_isStopped)
-            return;
-
         _isStopped = true;
         _context.CancelAllActiveOrders();
     }

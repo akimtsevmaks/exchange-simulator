@@ -62,8 +62,6 @@ public sealed class MarketMakerBot : ITradingBot
     
     public void Stop()
     {
-        if (!_isStopped) return;
-        
         _isStopped = true;
         _context.CancelAllActiveOrders();
     }
