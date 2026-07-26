@@ -1,5 +1,6 @@
 using exchange_simulator.Bots;
 using exchange_simulator.Enums;
+using exchange_simulator.Models;
 using exchange_simulator.Models.AccountTrading;
 using exchange_simulator.Models.TradingCore;
 
@@ -188,6 +189,27 @@ public sealed class LocalMarket
             .Where(bot => _botFailures.ContainsKey(bot.AccountId))
             .Select(bot => _botFailures[bot.AccountId])
             .ToArray());
+    
+    public LocalMarketSnapshot GetSnapshot()
+    {
+        lock (_syncRoot)
+        {
+            if (!_accountTradingService.TryGetAccount(
+                    ManualAccountId,
+                    out var manualAccount))
+            {
+                throw new InvalidOperationException(
+                    "The manual participant account is missing");
+            }
+
+            return new LocalMarketSnapshot(
+                _accountTradingService.GetOrderBookSnapshot(),
+                _accountTradingService.GetReferencePrice(),
+                _accountTradingService.GetTrades(),
+                manualAccount!,
+                _accountTradingService.GetActiveOrders(ManualAccountId));
+        }
+    }
     
     public bool TryStopBot(Guid botAccountId)
     {
