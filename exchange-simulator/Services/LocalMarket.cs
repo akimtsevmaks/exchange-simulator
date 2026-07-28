@@ -28,7 +28,7 @@ public sealed class LocalMarket
     public LocalMarket(
         Instrument instrument,
         decimal initialCashPerAccount,
-        long initialInstrumentPeerAccount,
+        long initialInstrumentsPerAccount,
         TimeSpan stepInterval,
         MarketMakerBotOptions marketMakerOptions,
         NoiseBotOptions noiseBotOptions)
@@ -37,7 +37,7 @@ public sealed class LocalMarket
         ArgumentNullException.ThrowIfNull(marketMakerOptions);
         ArgumentNullException.ThrowIfNull(noiseBotOptions);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCashPerAccount);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentPeerAccount);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentsPerAccount);
         
         if (stepInterval <= TimeSpan.Zero || 
             stepInterval.TotalMilliseconds > uint.MaxValue - 1)
@@ -46,9 +46,9 @@ public sealed class LocalMarket
         
         _accountTradingService = new AccountTradingService(instrument);
 
-        MarketMakerAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
-        NoiseBotAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
-        ManualAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentPeerAccount);
+        MarketMakerAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentsPerAccount);
+        NoiseBotAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentsPerAccount);
+        ManualAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentsPerAccount);
         
         StepInterval = stepInterval;
         _bots =
