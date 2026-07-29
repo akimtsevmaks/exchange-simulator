@@ -1,6 +1,5 @@
 using exchange_simulator.Bots;
 using exchange_simulator.Enums;
-using exchange_simulator.Models;
 using exchange_simulator.Models.AccountTrading;
 using exchange_simulator.Models.TradingCore;
 
@@ -8,7 +7,7 @@ namespace exchange_simulator.Services;
 
 public sealed class LocalMarket
 {
-    private readonly object _syncRoot = new();
+    private readonly Lock _syncRoot = new();
     private readonly AccountTradingService _accountTradingService;
     private readonly IReadOnlyList<ITradingBot> _bots;
     private readonly Dictionary<Guid, BotExecutionFailure> _botFailures = [];
@@ -22,7 +21,7 @@ public sealed class LocalMarket
     public Guid MarketMakerAccountId { get; }
     public Guid NoiseBotAccountId { get; }
     public Guid ManualAccountId { get; }
-    public TimeSpan StepInterval { get; }
+    private TimeSpan StepInterval { get; }
     public LocalMarketStatus Status => Execute(() => _status);
 
     public LocalMarket(
@@ -194,9 +193,7 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
-            if (!_accountTradingService.TryGetAccount(
-                    ManualAccountId,
-                    out var manualAccount))
+            if (!_accountTradingService.TryGetAccount(ManualAccountId, out var manualAccount))
             {
                 throw new InvalidOperationException(
                     "The manual participant account is missing");

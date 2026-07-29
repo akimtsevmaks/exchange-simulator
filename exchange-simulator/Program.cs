@@ -25,7 +25,7 @@ internal static class Program
                 QuoteOffset: 1m,
                 OrderSize: 10),
             noiseBotOptions: new NoiseBotOptions(
-                RandomSeed: 42,
+                RandomSeed: 111,
                 PriceOffset: 3m,
                 MaxOrderLots: 5,
                 MaxActiveOrders: 10));

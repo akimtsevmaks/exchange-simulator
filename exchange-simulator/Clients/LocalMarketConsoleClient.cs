@@ -1,6 +1,5 @@
 using System.Globalization;
 using exchange_simulator.Enums;
-using exchange_simulator.Models;
 using exchange_simulator.Models.TradingCore;
 using exchange_simulator.Services;
 
@@ -115,19 +114,12 @@ public sealed class LocalMarketConsoleClient
 
     private bool ExecuteLimitOrder(string[] parts, OrderSide side)
     {
-        if (!HasExpectedPartCount(
-                parts,
-                4,
-                $"{SideCommand(side)} limit <size> <price>"))
-        {
+        if (!HasExpectedPartCount(parts, 4, $"{SideCommand(side)} limit <size> <price>"))
             return true;
-        }
 
         if (!TryParseSize(parts[2], out var size) ||
             !TryParsePrice(parts[3], out var price))
-        {
             return true;
-        }
 
         PlaceOrder(side, OrderType.Limit, size, price);
         return true;
@@ -139,9 +131,7 @@ public sealed class LocalMarketConsoleClient
                 parts,
                 3,
                 $"{SideCommand(side)} market <size>"))
-        {
             return true;
-        }
 
         if (!TryParseSize(parts[2], out var size))
             return true;
@@ -195,12 +185,7 @@ public sealed class LocalMarketConsoleClient
         long size,
         decimal? price = null)
     {
-        var command = new PlaceOrderCommand(
-            _market.ManualAccountId,
-            side,
-            type,
-            size,
-            price);
+        var command = new PlaceOrderCommand(_market.ManualAccountId, side, type, size, price);
 
         PrintPlacementResult(_market.PlaceOrder(command));
     }
@@ -334,14 +319,8 @@ public sealed class LocalMarketConsoleClient
 
     private bool TryParseSize(string value, out long size)
     {
-        if (long.TryParse(
-                value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out size))
-        {
+        if (long.TryParse(value,NumberStyles.Integer, CultureInfo.InvariantCulture, out size))
             return true;
-        }
 
         _output.WriteLine("Invalid size");
         return false;
@@ -354,17 +333,10 @@ public sealed class LocalMarketConsoleClient
             NumberStyles.AllowDecimalPoint;
 
         var normalizedValue = value.Contains(',') && !value.Contains('.')
-            ? value.Replace(',', '.')
-            : value;
+            ? value.Replace(',', '.') : value;
 
-        if (decimal.TryParse(
-                normalizedValue,
-                styles,
-                CultureInfo.InvariantCulture,
-                out price))
-        {
+        if (decimal.TryParse(normalizedValue, styles, CultureInfo.InvariantCulture, out price))
             return true;
-        }
 
         _output.WriteLine("Invalid price");
         return false;

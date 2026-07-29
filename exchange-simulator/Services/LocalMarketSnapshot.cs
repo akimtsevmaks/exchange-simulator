@@ -1,7 +1,7 @@
 using exchange_simulator.Models.AccountTrading;
 using exchange_simulator.Models.TradingCore;
 
-namespace exchange_simulator.Models;
+namespace exchange_simulator.Services;
 
 public sealed record LocalMarketSnapshot(
     OrderBookSnapshot OrderBook,
