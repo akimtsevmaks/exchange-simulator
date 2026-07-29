@@ -26,7 +26,7 @@ public sealed class MarketMakerBot : ITradingBot
                 "Quote offset must be less than the initial instrument price.");
         }
 
-        if (orderSize % market.Instrument.InitialPrice != 0)
+        if (orderSize % market.Instrument.LotSize != 0)
         {
             throw new ArgumentException(
                 "Order size must be a multiple of the instrument lot size", nameof(orderSize));
@@ -49,7 +49,7 @@ public sealed class MarketMakerBot : ITradingBot
         var activeOrders = _context.GetActiveOrders();
         
         var bidToKeep = FindCurrentQuote(activeOrders, OrderSide.Buy, bidPrice);
-        var askToKeep = FindCurrentQuote(activeOrders, OrderSide.Sell, bidPrice);
+        var askToKeep = FindCurrentQuote(activeOrders, OrderSide.Sell, askPrice);
         
         CancelStaleOrders(activeOrders, bidToKeep, askToKeep);
         
