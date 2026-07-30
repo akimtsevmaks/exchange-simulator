@@ -147,7 +147,7 @@ public sealed class LocalMarketConsoleClient
 
         if (!Guid.TryParse(parts[1], out var orderId))
         {
-            _output.WriteLine("Invalid order id.");
+            _output.WriteLine("Invalid order id");
             return true;
         }
 
