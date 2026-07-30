@@ -126,4 +126,66 @@ public abstract class LocalMarketTestBase
         Assert.True(isFound);
         return Assert.IsType<OrderSnapshot>(order);
     }
+    
+    protected static void AssertEconomicStateIsConsistent(
+        LocalMarketService market,
+        decimal expectedTotalCash,
+        long expectedTotalInstruments)
+    {
+        var accountIds = new[]
+        {
+            market.MarketMakerAccountId,
+            market.NoiseBotAccountId,
+            market.ManualAccountId
+        };
+
+        var accounts = accountIds
+            .Select(accountId => GetAccount(market, accountId)).ToArray();
+
+        Assert.Equal(
+            expectedTotalCash,
+            accounts.Sum(account => account.CashBalance));
+        Assert.Equal(
+            expectedTotalInstruments,
+            accounts.Sum(account => account.Position.Quantity));
+
+        foreach (var account in accounts)
+        {
+            Assert.True(account.CashBalance >= 0);
+            Assert.True(account.ReservedCash >= 0);
+            Assert.True(account.AvailableCash >= 0);
+            Assert.Equal(
+                account.CashBalance,
+                account.ReservedCash + account.AvailableCash);
+
+            Assert.True(account.Position.Quantity >= 0);
+            Assert.True(account.Position.ReservedQuantity >= 0);
+            Assert.True(account.Position.AvailableQuantity >= 0);
+            Assert.Equal(
+                account.Position.Quantity,
+                account.Position.ReservedQuantity + account.Position.AvailableQuantity);
+
+            var activeOrders = market.GetActiveOrders(account.Id);
+            var reservedCash = activeOrders
+                .Where(order => order.OrderSide == OrderSide.Buy)
+                .Sum(order => order.Price!.Value * order.RemainingSize);
+            var reservedInstruments = activeOrders
+                .Where(order => order.OrderSide == OrderSide.Sell)
+                .Sum(order => order.RemainingSize);
+
+            Assert.Equal(account.ReservedCash, reservedCash);
+            Assert.Equal(account.Position.ReservedQuantity, reservedInstruments);
+            Assert.All(
+                activeOrders,
+                order => Assert.Equal(order.Size, order.FilledSize + order.RemainingSize));
+
+            var operations = market.GetAccountOperations(account.Id);
+            Assert.Equal(
+                account.CashBalance,
+                operations.Sum(operation => operation.CashChange));
+            Assert.Equal(
+                account.Position.Quantity,
+                operations.Sum(operation => operation.InstrumentQuantityChange));
+        }
+    }
 }
