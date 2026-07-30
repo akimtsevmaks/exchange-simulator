@@ -42,7 +42,7 @@ public sealed class LocalMarket
     {
     }
     
-    public LocalMarket(
+    internal LocalMarket(
         Instrument instrument,
         decimal initialCashPerAccount,
         long initialInstrumentsPerAccount,
