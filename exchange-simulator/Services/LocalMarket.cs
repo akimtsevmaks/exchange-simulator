@@ -23,7 +23,7 @@ public sealed class LocalMarket
     public Guid ManualAccountId { get; }
     private TimeSpan StepInterval { get; }
     public LocalMarketStatus Status => Execute(() => _status);
-
+    
     public LocalMarket(
         Instrument instrument,
         decimal initialCashPerAccount,
@@ -31,10 +31,26 @@ public sealed class LocalMarket
         TimeSpan stepInterval,
         MarketMakerBotOptions marketMakerOptions,
         NoiseBotOptions noiseBotOptions)
+        : this(
+            instrument,
+            initialCashPerAccount,
+            initialInstrumentsPerAccount,
+            stepInterval,
+            CreateDefaultBotFactory(
+                marketMakerOptions,
+                noiseBotOptions))
+    {
+    }
+    
+    public LocalMarket(
+        Instrument instrument,
+        decimal initialCashPerAccount,
+        long initialInstrumentsPerAccount,
+        TimeSpan stepInterval,
+        Func<LocalMarket, IReadOnlyList<ITradingBot>> botFactory)
     {
         ArgumentNullException.ThrowIfNull(instrument);
-        ArgumentNullException.ThrowIfNull(marketMakerOptions);
-        ArgumentNullException.ThrowIfNull(noiseBotOptions);
+        ArgumentNullException.ThrowIfNull(botFactory);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCashPerAccount);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentsPerAccount);
         
@@ -50,14 +66,32 @@ public sealed class LocalMarket
         ManualAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentsPerAccount);
         
         StepInterval = stepInterval;
-        _bots =
+        _bots = botFactory(this).ToArray();
+        
+        if (_bots.Count == 0 || _bots.Any(bot => bot is null))
+        {
+            throw new ArgumentException(
+                "At least one non-null bot must be provided",
+                nameof(botFactory));
+        }
+    }
+    
+    private static Func<LocalMarket, IReadOnlyList<ITradingBot>> CreateDefaultBotFactory(
+            MarketMakerBotOptions marketMakerOptions,
+            NoiseBotOptions noiseBotOptions)
+    {
+        ArgumentNullException.ThrowIfNull(marketMakerOptions);
+        ArgumentNullException.ThrowIfNull(noiseBotOptions);
+
+        return market =>
         [
             new MarketMakerBot(
-                this,
+                market,
                 marketMakerOptions.QuoteOffset,
                 marketMakerOptions.OrderSize),
+
             new NoiseBot(
-                this,
+                market,
                 noiseBotOptions.RandomSeed,
                 noiseBotOptions.PriceOffset,
                 noiseBotOptions.MaxOrderLots,
