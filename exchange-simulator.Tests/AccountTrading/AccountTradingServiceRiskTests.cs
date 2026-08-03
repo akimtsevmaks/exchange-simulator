@@ -281,4 +281,112 @@ public class AccountTradingServiceRiskTests : AccountTradingServiceTestBase
         Assert.Equal(before, GetAccount(service, buyerId));
         Assert.Empty(service.GetActiveOrders(buyerId));
     }
+    
+    [Fact]
+    public void PlaceMarketSell_ShouldLeaveAllStateUnchanged_WhenBuyerPositionWouldOverflow()
+    {
+        // Arrange
+        var service = new AccountTradingService(GetAccountTestInstrument(lotSize: 1, initialPrice: 1m));
+        
+        var buyerId = RegisterAccount(service, cash: 1m, instruments: long.MaxValue);
+        var sellerId = RegisterAccount(service, instruments: 1);
+        
+        var buyOrder = GetOrder(PlaceLimit(service, buyerId, OrderSide.Buy, 1, 1m));
+        
+        var buyerBefore = GetAccount(service, buyerId);
+        var sellerBefore = GetAccount(service, sellerId);
+        var buyerOperationsBefore = service.GetAccountOperations(buyerId);
+        var sellerOperationsBefore = service.GetAccountOperations(sellerId);
+        var buyHistoryBefore = service.GetOrderHistory(buyOrder.Id);
+
+        // Act
+        var act = () =>
+            PlaceMarket(service, sellerId, OrderSide.Sell, 1);
+
+        // Assert
+        Assert.Throws<OverflowException>(act);
+        Assert.Equal(buyerBefore, GetAccount(service, buyerId));
+        Assert.Equal(sellerBefore, GetAccount(service, sellerId));
+        Assert.Equal(buyerOperationsBefore, service.GetAccountOperations(buyerId));
+        Assert.Equal(sellerOperationsBefore, service.GetAccountOperations(sellerId));
+        Assert.Equal(buyHistoryBefore, service.GetOrderHistory(buyOrder.Id));
+        Assert.Equal(buyOrder, Assert.Single(service.GetActiveOrders(buyerId)));
+        Assert.Empty(service.GetActiveOrders(sellerId));
+        Assert.Empty(service.GetTrades());
+    }
+
+    [Fact]
+    public void PlaceMarketBuy_ShouldLeaveAllStateUnchanged_WhenSellerCashWouldOverflow()
+    {
+        // Arrange
+        var service = new AccountTradingService(GetAccountTestInstrument(lotSize: 1, initialPrice: 1m));
+        
+        var sellerId = RegisterAccount(service, cash: decimal.MaxValue, instruments: 1);
+        var buyerId = RegisterAccount(service, cash: 1m);
+        
+        var sellOrder = GetOrder(PlaceLimit(service, sellerId, OrderSide.Sell, 1, 1m));
+        
+        var sellerBefore = GetAccount(service, sellerId);
+        var buyerBefore = GetAccount(service, buyerId);
+        var sellerOperationsBefore = service.GetAccountOperations(sellerId);
+        var buyerOperationsBefore = service.GetAccountOperations(buyerId);
+        var sellHistoryBefore = service.GetOrderHistory(sellOrder.Id);
+
+        // Act
+        var act = () =>
+            PlaceMarket(service, buyerId, OrderSide.Buy, 1);
+
+        // Assert
+        Assert.Throws<OverflowException>(act);
+        Assert.Equal(sellerBefore, GetAccount(service, sellerId));
+        Assert.Equal(buyerBefore, GetAccount(service, buyerId));
+        Assert.Equal(sellerOperationsBefore, service.GetAccountOperations(sellerId));
+        Assert.Equal(buyerOperationsBefore, service.GetAccountOperations(buyerId));
+        Assert.Equal(sellHistoryBefore, service.GetOrderHistory(sellOrder.Id));
+        Assert.Equal(sellOrder, Assert.Single(service.GetActiveOrders(sellerId)));
+        Assert.Empty(service.GetActiveOrders(buyerId));
+        Assert.Empty(service.GetTrades());
+    }
+
+    [Fact]
+    public void PlaceMarketBuy_ShouldLeaveAllPlannedTradesUnapplied_WhenPositionOverflowsOnSecondTrade()
+    {
+        // Arrange
+        var service = new AccountTradingService(GetAccountTestInstrument(lotSize: 1, initialPrice: 1m));
+        
+        var firstSellerId = RegisterAccount(service, instruments: 1);
+        var secondSellerId = RegisterAccount(service, instruments: 1);
+        var buyerId = RegisterAccount(service, cash: 2m, instruments: long.MaxValue - 1);
+        
+        var firstSellOrder = GetOrder(PlaceLimit(service, firstSellerId, OrderSide.Sell, 1, 1m));
+        var secondSellOrder = GetOrder(PlaceLimit(service, secondSellerId, OrderSide.Sell, 1, 1m));
+        
+        var firstSellerBefore = GetAccount(service, firstSellerId);
+        var secondSellerBefore = GetAccount(service, secondSellerId);
+        var buyerBefore = GetAccount(service, buyerId);
+        var firstSellerOperationsBefore = service.GetAccountOperations(firstSellerId);
+        var secondSellerOperationsBefore = service.GetAccountOperations(secondSellerId);
+        var buyerOperationsBefore = service.GetAccountOperations(buyerId);
+        var firstSellHistoryBefore = service.GetOrderHistory(firstSellOrder.Id);
+        var secondSellHistoryBefore = service.GetOrderHistory(secondSellOrder.Id);
+
+        // Act
+        var act = () =>
+            PlaceMarket(service, buyerId, OrderSide.Buy, 2);
+
+        // Assert
+        Assert.Throws<OverflowException>(act);
+        Assert.Equal(firstSellerBefore, GetAccount(service, firstSellerId));
+        Assert.Equal(secondSellerBefore, GetAccount(service, secondSellerId));
+        Assert.Equal(buyerBefore, GetAccount(service, buyerId));
+        Assert.Equal(firstSellerOperationsBefore, service.GetAccountOperations(firstSellerId));
+        Assert.Equal(secondSellerOperationsBefore, service.GetAccountOperations(secondSellerId));
+        Assert.Equal(buyerOperationsBefore, service.GetAccountOperations(buyerId));
+        Assert.Equal(firstSellHistoryBefore, service.GetOrderHistory(firstSellOrder.Id));
+        Assert.Equal(secondSellHistoryBefore, service.GetOrderHistory(secondSellOrder.Id));
+        Assert.Equal(firstSellOrder, Assert.Single(service.GetActiveOrders(firstSellerId)));
+        Assert.Equal(secondSellOrder, Assert.Single(service.GetActiveOrders(secondSellerId)));
+        Assert.Empty(service.GetActiveOrders(buyerId));
+        Assert.Empty(service.GetTrades());
+    }
 }

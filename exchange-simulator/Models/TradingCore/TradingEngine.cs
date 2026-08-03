@@ -16,17 +16,22 @@ public class TradingEngine
         Instrument = instrument;
         _orderBook = new OrderBook(Instrument);
     }
+    
+    public OrderCommandResult PlaceOrder(PlaceOrderCommand command) =>
+        PlaceOrder(command, static _ => { });
 
-    public OrderCommandResult PlaceOrder(PlaceOrderCommand command)
-    {
+    internal OrderCommandResult PlaceOrder(PlaceOrderCommand command, 
+        Action<IReadOnlyList<PlannedTrade>> validatePlannedTrades)
+    { 
         ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(validatePlannedTrades);
         
         if (!ValidateOrderRequest(command, out var reason))
             return new OrderCommandResult(false, reason, null, []);
         
         var order = new Order(command.OwnerId, command.Type, command.Side, Instrument, command.Size, command.Price);
         
-        var result = _orderBook.ProcessOrder(order);
+        var result = _orderBook.ProcessOrder(order, validatePlannedTrades);
         
         _orders.Add(order.Id, order);
         _trades.AddRange(result.Trades);

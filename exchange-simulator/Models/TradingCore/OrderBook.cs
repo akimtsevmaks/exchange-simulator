@@ -10,6 +10,7 @@ public class OrderBook
         public LinkedList<Order> Orders { get; } = [];
     }
     private sealed record OrderLocation(PriceLevel Level, LinkedListNode<Order> Node, OrderSide Side);
+    private sealed record PlannedMatch(PriceLevel Level, LinkedListNode<Order> RestingNode, long Size);
     
     private readonly SortedDictionary<decimal, PriceLevel> _bids = 
         new(Comparer<decimal>.Create((a, b) => b.CompareTo(a)));
@@ -46,10 +47,15 @@ public class OrderBook
         
         return result.AsReadOnly();
     }
+    
+    public OrderProcessingResult ProcessOrder(Order incomingOrder) =>
+        ProcessOrder(incomingOrder, static _ => { });
 
-    public OrderProcessingResult ProcessOrder(Order incomingOrder)
+    internal OrderProcessingResult ProcessOrder(Order incomingOrder,
+        Action<IReadOnlyList<PlannedTrade>> validatePlannedTrades)
     {
         ArgumentNullException.ThrowIfNull(incomingOrder);
+        ArgumentNullException.ThrowIfNull(validatePlannedTrades);
 
         if (incomingOrder.Instrument.Id != Instrument.Id)
             throw new ArgumentException(
@@ -62,29 +68,24 @@ public class OrderBook
             throw new ArgumentException($"{incomingOrder.Id} already exists", nameof(incomingOrder));
 
         var oppositeSideLevels = incomingOrder.Side == OrderSide.Buy ? _asks : _bids;
+        var matchPlan = BuildMatchPlan(incomingOrder, oppositeSideLevels);
+        var plannedTrades = matchPlan.Select(match => CreatePlannedTrade(incomingOrder, match)).ToList();
 
+        validatePlannedTrades(plannedTrades);
+        
         var trades = new List<Trade>();
 
-        while (incomingOrder.RemainingSize > 0 && oppositeSideLevels.Count > 0)
+        foreach (var match in matchPlan)
         {
-            var bestLevel = oppositeSideLevels.First().Value;
+            var restingOrder = match.RestingNode.Value;
+            
+            incomingOrder.Fill(match.Size);
+            restingOrder.Fill(match.Size);
+            
+            trades.Add(CreateTrade(incomingOrder, restingOrder, match.Level.Price, match.Size));
 
-            if (!CanMatch(incomingOrder, bestLevel.Price)) 
-                break;
-
-            var restingNode = bestLevel.Orders.First ??
-                              throw new InvalidOperationException("Price level cannot be empty");
-            var restingOrder = restingNode.Value;
-            
-            var tradeSize = Math.Min(restingOrder.RemainingSize, incomingOrder.RemainingSize);
-            
-            incomingOrder.Fill(tradeSize);
-            restingOrder.Fill(tradeSize);
-            
-            trades.Add(CreateTrade(incomingOrder, restingOrder, bestLevel.Price, tradeSize));
-            
-            if (restingOrder.RemainingSize == 0) 
-                RemoveFilledOrder(oppositeSideLevels, bestLevel, restingNode);
+            if (restingOrder.RemainingSize == 0)
+                RemoveFilledOrder(oppositeSideLevels, match.Level, match.RestingNode);
         }
 
         var isResting = incomingOrder.Type == OrderType.Limit && incomingOrder.RemainingSize > 0;
@@ -96,6 +97,46 @@ public class OrderBook
             incomingOrder.Cancel();
         
         return new OrderProcessingResult(trades, incomingOrder.RemainingSize, isResting);
+    }
+    
+    private static IReadOnlyList<PlannedMatch> BuildMatchPlan(Order incomingOrder,
+        SortedDictionary<decimal, PriceLevel> oppositeSideLevels)
+    {
+        var matches = new List<PlannedMatch>();
+        var remainingSize = incomingOrder.RemainingSize;
+
+        foreach (var level in oppositeSideLevels.Values)
+        {
+            if (remainingSize == 0 || !CanMatch(incomingOrder, level.Price))
+                break;
+
+            var node = level.Orders.First ?? throw new InvalidOperationException("Price level cannot be empty");
+
+            while (node is not null && remainingSize > 0)
+            {
+                var matchSize = Math.Min(node.Value.RemainingSize, remainingSize);
+                matches.Add(new PlannedMatch(level, node, matchSize));
+                remainingSize -= matchSize;
+                node = node.Next;
+            }
+        }
+
+        return matches;
+    }
+    
+    private static PlannedTrade CreatePlannedTrade(Order incomingOrder, PlannedMatch match)
+    {
+        var restingOrder = match.RestingNode.Value;
+        var buyerAccountId = incomingOrder.Side == OrderSide.Buy
+            ? incomingOrder.OwnerId : restingOrder.OwnerId;
+        var sellerAccountId = incomingOrder.Side == OrderSide.Sell
+            ? incomingOrder.OwnerId : restingOrder.OwnerId;
+
+        return new PlannedTrade(
+            buyerAccountId,
+            sellerAccountId,
+            match.Level.Price,
+            match.Size);
     }
 
     private static bool CanMatch(Order order, decimal restingPrice)

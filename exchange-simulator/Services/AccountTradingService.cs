@@ -113,8 +113,25 @@ public sealed class AccountTradingService
             if (!account.TryReserveInstruments(reservedInstruments))
                 return RejectOrder(OrderRejectionReason.InsufficientAvailablePosition);
         }
-        
-        var result = _tradingEngine.PlaceOrder(command);
+
+        var settlementValidated = false;
+        OrderCommandResult result;
+
+        try
+        {
+            result = _tradingEngine.PlaceOrder(command,
+                plannedTrades =>
+                {
+                    ValidateSettlement(plannedTrades);
+                    settlementValidated = true;
+                });
+        }
+        catch
+        {
+            if (!settlementValidated)
+                ReleaseReservation(account, reservedCash, reservedInstruments);
+            throw;
+        }
 
         if (!result.IsSuccess)
         {
@@ -239,6 +256,31 @@ public sealed class AccountTradingService
         
         buyer.SettleBuy(trade, buyOrder.Id, buyReservedCash);
         seller.SettleSell(trade, sellOrder.Id);
+    }
+    
+    private void ValidateSettlement(IReadOnlyList<PlannedTrade> plannedTrades)
+    {
+        var projections = new Dictionary<Guid, SettlementProjection>();
+
+        foreach (var plannedTrade in plannedTrades)
+        {
+            if (plannedTrade.BuyerAccountId == plannedTrade.SellerAccountId)
+                continue;
+
+            var cost = checked(plannedTrade.Price * plannedTrade.Size);
+            GetProjection(plannedTrade.BuyerAccountId).ApplyBuy(plannedTrade.Size, cost);
+            GetProjection(plannedTrade.SellerAccountId).ApplySell(cost);
+        }
+
+        SettlementProjection GetProjection(Guid accountId)
+        {
+            if (projections.TryGetValue(accountId, out var projection))
+                return projection;
+
+            projection = new SettlementProjection(GetAccount(accountId));
+            projections.Add(accountId, projection);
+            return projection;
+        }
     }
 
     private OrderSnapshot GetOrder(Guid orderId)
@@ -385,4 +427,30 @@ public sealed class AccountTradingService
         return history;
     }
 
+    private sealed class SettlementProjection
+    {
+        private decimal _cashBalance;
+        private long _positionQuantity;
+        private decimal _positionAveragePrice;
+
+        public SettlementProjection(TradingAccount account)
+        {
+            _cashBalance = account.CashBalance;
+            _positionQuantity = account.Position.Quantity;
+            _positionAveragePrice = account.Position.AveragePrice;
+        }
+
+        public void ApplyBuy(long quantity, decimal cost)
+        {
+            var newQuantity = checked(_positionQuantity + quantity);
+            var currentCost = checked(_positionAveragePrice * _positionQuantity);
+            var newCost = checked(currentCost + cost);
+
+            _positionQuantity = newQuantity;
+            _positionAveragePrice = newCost / newQuantity;
+        }
+
+        public void ApplySell(decimal proceeds) =>
+            _cashBalance = checked(_cashBalance + proceeds);
+    }
 }
