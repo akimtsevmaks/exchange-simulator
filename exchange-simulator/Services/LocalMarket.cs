@@ -54,7 +54,7 @@ public sealed class LocalMarket
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCashPerAccount);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentsPerAccount);
         
-        if (stepInterval <= TimeSpan.FromMicroseconds(1) || 
+        if (stepInterval < TimeSpan.FromMilliseconds(1) || 
             stepInterval.TotalMilliseconds > uint.MaxValue - 1)
             throw new ArgumentOutOfRangeException(nameof(stepInterval),
                 "Step interval is outside the supported range");
