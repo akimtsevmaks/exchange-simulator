@@ -36,6 +36,29 @@ public class LocalMarketLifecycleTests : LocalMarketTestBase
                     .Select(operation => operation.Type));
         }
     }
+    
+    [Fact]
+    public void Constructor_ShouldThrow_WhenStepIntervalIsSubMillisecond()
+    {
+        // Act
+        var act = () =>
+            GetMarket(stepInterval: TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond - 1));
+
+        // Assert
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(act);
+        Assert.Equal("stepInterval", exception.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_ShouldAcceptOneMillisecondStepInterval()
+    {
+        // Act
+        var market = GetMarket(stepInterval: TimeSpan.FromMilliseconds(1));
+
+        // Assert
+        Assert.Equal(LocalMarketStatus.Created, market.Status);
+    }
+
 
     [Fact]
     public void Step_ShouldRunMarketMakerBeforeNoiseBot()

@@ -1,3 +1,4 @@
+using System.Numerics;
 using exchange_simulator.Enums;
 using exchange_simulator.Models;
 using exchange_simulator.Models.TradingCore;
@@ -98,6 +99,28 @@ public class TradingEngineQueryTests : TradingEngineTestBase
         Assert.Equal(
             [new OrderBookLevel(110m, 10), new OrderBookLevel(120m, 30)],
             snapshot.Asks);
+    }
+    
+    [Theory]
+    [InlineData(OrderSide.Buy)]
+    [InlineData(OrderSide.Sell)]
+    public void GetOrderBookSnapshot_ShouldAggregateLevelBeyondLongRange(OrderSide side)
+    {
+        // Arrange
+        var engine = new TradingEngine(GetTestInstrument(lotSize: 1));
+        var firstOrder = GetResultOrder(engine.PlaceOrder(GetLimitCommand(side, long.MaxValue, 100m)));
+        var secondOrder = GetResultOrder(engine.PlaceOrder(GetLimitCommand(side, long.MaxValue, 100m)));
+
+        // Act
+        var snapshot = engine.GetOrderBookSnapshot();
+
+        // Assert
+        var levels = side == OrderSide.Buy ? snapshot.Bids : snapshot.Asks;
+        var level = Assert.Single(levels);
+
+        Assert.Equal(100m, level.Price);
+        Assert.Equal((BigInteger)long.MaxValue * 2, level.Size);
+        Assert.Equal([firstOrder, secondOrder], engine.GetActiveOrders());
     }
     
     [Fact]

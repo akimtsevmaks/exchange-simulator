@@ -75,7 +75,7 @@ public sealed class AccountTradingService
             if (remainingSize == 0)
                 break;
             
-            var sizeAtLevel = Math.Min(remainingSize, level.Size);
+            var sizeAtLevel = level.Size >= remainingSize ? remainingSize : (long)level.Size;
 
             executableSize += sizeAtLevel;
             remainingSize -= sizeAtLevel;

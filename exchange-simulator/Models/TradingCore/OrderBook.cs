@@ -1,4 +1,5 @@
 using exchange_simulator.Enums;
+using System.Numerics;
 
 namespace exchange_simulator.Models.TradingCore;
 
@@ -41,7 +42,7 @@ public class OrderBook
 
         foreach (var level in levels.Values)
         {
-            var totalSize = level.Orders.Sum(order => order.RemainingSize);
+            var totalSize = level.Orders.Aggregate(BigInteger.Zero, (sum, order) => sum + order.RemainingSize);
             result.Add(new OrderBookLevel(level.Price, totalSize));
         }
         

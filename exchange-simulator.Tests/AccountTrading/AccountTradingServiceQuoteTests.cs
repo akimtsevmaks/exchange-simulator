@@ -91,6 +91,27 @@ public class AccountTradingServiceQuoteTests : AccountTradingServiceTestBase
     }
     
     [Fact]
+    public void GetMarketBuyQuote_ShouldHandlePriceLevelBeyondLongRange()
+    {
+        // Arrange
+        var service = new AccountTradingService(GetAccountTestInstrument(lotSize: 1, initialPrice: 1m));
+        var firstSellerId = RegisterAccount(service, instruments: long.MaxValue);
+        var secondSellerId = RegisterAccount(service, instruments: long.MaxValue);
+
+        Assert.True(PlaceLimit(service, firstSellerId, OrderSide.Sell, long.MaxValue, 1m).IsSuccess);
+        Assert.True(PlaceLimit(service, secondSellerId, OrderSide.Sell, long.MaxValue, 1m).IsSuccess);
+
+        // Act
+        var quote = service.GetMarketBuyQuote(long.MaxValue);
+
+        // Assert
+        Assert.Equal(long.MaxValue, quote.RequestedSize);
+        Assert.Equal(long.MaxValue, quote.ExecutableSize);
+        Assert.Equal(0, quote.UnfilledSize);
+        Assert.Equal((decimal)long.MaxValue, quote.Cost);
+    }
+    
+    [Fact]
     public void GetMarketBuyQuote_ShouldNotChangeOrdersOrReservations()
     {
         // Arrange
