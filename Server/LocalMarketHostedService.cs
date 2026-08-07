@@ -2,7 +2,7 @@ using exchange_simulator.Services;
 
 namespace exchange_simulator.Server;
 
-internal sealed class LocalMarketHostedService(LocaпlMarket market): IHostedService
+internal sealed class LocalMarketHostedService(LocalMarket market): IHostedService
 {
     private readonly LocalMarket _market = market;
 
