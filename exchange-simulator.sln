@@ -4,11 +4,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator", "excha
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator.Tests", "exchange-simulator.Tests\exchange-simulator.Tests.csproj", "{8BB6C2D5-369D-4E2B-971F-81DAD535E2C9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "Client\Client.csproj", "{D968D951-0C51-454B-B626-8D77698F6E65}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator.Client", "exchange-simulator.Client\exchange-simulator.Client.csproj", "{D968D951-0C51-454B-B626-8D77698F6E65}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contracts", "Contracts\Contracts.csproj", "{DA9B762F-9F2C-462A-935B-A56379CCBFB3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator.Contracts", "exchange-simulator.Contracts\exchange-simulator.Contracts.csproj", "{DA9B762F-9F2C-462A-935B-A56379CCBFB3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{035ADBC7-0265-4C88-A74F-FB07AAFA363D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exchange-simulator.Server", "exchange-simulator.Server\exchange-simulator.Server.csproj", "{035ADBC7-0265-4C88-A74F-FB07AAFA363D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
