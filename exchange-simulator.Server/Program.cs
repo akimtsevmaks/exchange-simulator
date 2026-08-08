@@ -21,6 +21,7 @@ builder.Services.AddHostedService<LocalMarketHostedService>();
 var app = builder.Build();
 
 app.MapPublicMarketEndpoints();
+app.MapPersonalAccountEndpoints();
 
 app.Run();
 
