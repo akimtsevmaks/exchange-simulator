@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 using exchange_simulator.Bots;
 using exchange_simulator.Models.TradingCore;
 using exchange_simulator.Server;
@@ -5,10 +8,18 @@ using exchange_simulator.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.ConfigureHttpJsonOptions(option => 
+    option.SerializerOptions.Converters.Add(
+        new JsonStringEnumConverter(
+            JsonNamingPolicy.CamelCase,
+            allowIntegerValues: false)));
+
 builder.Services.AddSingleton(CreateMarket());
 builder.Services.AddHostedService<LocalMarketHostedService>();
 
 var app = builder.Build();
+
+app.MapPublicMarketEndpoints();
 
 app.Run();
 
