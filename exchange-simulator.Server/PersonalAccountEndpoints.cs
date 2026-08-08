@@ -25,7 +25,7 @@ internal static class PersonalAccountEndpoints
         if (!market.TryGetAccount(participant.AccountId, out var account))
         {
             throw new InvalidOperationException(
-                "The test participant account is not registered in the local market.");
+                "The test participant account is not registered in the local market");
         }
 
         return TypedResults.Ok(

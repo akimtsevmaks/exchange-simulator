@@ -40,7 +40,7 @@ internal static class PublicMarketEndpoints
             return TypedResults.BadRequest(
                 new ApiErrorResponse(
                     "InvalidLimit",
-                    $"Query parameter 'limit' must be from 1 to {MaximumTradeLimit}."));
+                    $"Query parameter 'limit' must be from 1 to {MaximumTradeLimit}"));
         }
 
         var trades = market.GetTrades().TakeLast(limit)

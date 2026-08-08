@@ -22,6 +22,7 @@ var app = builder.Build();
 
 app.MapPublicMarketEndpoints();
 app.MapPersonalAccountEndpoints();
+app.MapTradingCommandEndpoints();
 
 app.Run();
 
