@@ -15,6 +15,7 @@ builder.Services.ConfigureHttpJsonOptions(option =>
             allowIntegerValues: false)));
 
 builder.Services.AddSingleton(CreateMarket());
+builder.Services.AddSingleton<TestParticipant>();
 builder.Services.AddHostedService<LocalMarketHostedService>();
 
 var app = builder.Build();
