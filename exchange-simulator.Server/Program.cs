@@ -8,17 +8,25 @@ using exchange_simulator.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
 builder.Services.ConfigureHttpJsonOptions(option => 
     option.SerializerOptions.Converters.Add(
         new JsonStringEnumConverter(
             JsonNamingPolicy.CamelCase,
             allowIntegerValues: false)));
 
+builder.Services.Configure<RouteHandlerOptions>(options =>
+    options.ThrowOnBadRequest = true);
+
 builder.Services.AddSingleton(CreateMarket());
 builder.Services.AddSingleton<TestParticipant>();
 builder.Services.AddHostedService<LocalMarketHostedService>();
 
 var app = builder.Build();
+
+app.UseMiddleware<ApiErrorMiddleware>();
 
 app.MapPublicMarketEndpoints();
 app.MapPersonalAccountEndpoints();
