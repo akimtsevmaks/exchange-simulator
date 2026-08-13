@@ -11,5 +11,9 @@
     <ItemGroup>
         <ProjectReference Include="..\exchange-simulator.Contracts\exchange-simulator.Contracts.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="exchange-simulator.Tests" />
+    </ItemGroup>
     
 </Project>
