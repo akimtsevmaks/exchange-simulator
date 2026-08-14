@@ -150,8 +150,7 @@ public class LocalMarketConsoleClientTests : LocalMarketTestBase
     [InlineData("cancel", "Usage: cancel <orderId>")]
     [InlineData("cancel invalid", "Invalid order id")]
     [InlineData("invalid", "Unknown command 'invalid'")]
-    [InlineData("buy limit 9223372036854775807 79228162514264337593543950335",
-        "Command rejected: numeric value is outside the supported range")]
+    [InlineData("buy limit 9223372036854775807 79228162514264337593543950335", "OrderValueTooLarge")]
     public async Task RunAsync_ShouldPrintInputError(string command, string expectedMessage)
     {
         // Arrange

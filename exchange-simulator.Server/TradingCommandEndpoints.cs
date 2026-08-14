@@ -66,6 +66,7 @@ internal static class TradingCommandEndpoints
             OrderRejectionReason.InvalidOrderType or
             OrderRejectionReason.InvalidOrderSide or
             OrderRejectionReason.InvalidSize or
+            OrderRejectionReason.OrderValueTooLarge or
             OrderRejectionReason.QuantityNotMultipleOfLotSize or
             OrderRejectionReason.InvalidPrice or
             OrderRejectionReason.PriceRequiredForLimitOrder or
@@ -99,6 +100,8 @@ internal static class TradingCommandEndpoints
                 "Order side is invalid",
             OrderRejectionReason.InvalidSize =>
                 "Order size must be greater than zero",
+            OrderRejectionReason.OrderValueTooLarge =>
+                "Order value is too large",
             OrderRejectionReason.QuantityNotMultipleOfLotSize =>
                 "Order size must be a multiple of the instrument lot size",
             OrderRejectionReason.InvalidPrice =>

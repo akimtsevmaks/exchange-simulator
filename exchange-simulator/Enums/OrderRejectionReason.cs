@@ -6,6 +6,7 @@ public enum OrderRejectionReason
     InvalidOrderType,
     InvalidOrderSide,
     InvalidSize,
+    OrderValueTooLarge,
     QuantityNotMultipleOfLotSize,
     InvalidPrice,
     PriceRequiredForLimitOrder,

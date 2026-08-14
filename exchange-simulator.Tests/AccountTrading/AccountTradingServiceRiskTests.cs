@@ -265,7 +265,7 @@ public class AccountTradingServiceRiskTests : AccountTradingServiceTestBase
     }
     
     [Fact]
-    public void PlaceLimitBuy_ShouldLeaveAccountUnchanged_WhenReservationValueOverflows()
+    public void PlaceLimitBuy_ShouldRejectWithoutSideEffects_WhenReservationValueOverflows()
     {
         // Arrange
         var service = new AccountTradingService(GetAccountTestInstrument());
@@ -273,11 +273,11 @@ public class AccountTradingServiceRiskTests : AccountTradingServiceTestBase
         var before = GetAccount(service, buyerId);
 
         // Act
-        var act = () =>
-            PlaceLimit(service, buyerId, OrderSide.Buy, 10, decimal.MaxValue);
+        var result = PlaceLimit(service, buyerId, OrderSide.Buy, 10, decimal.MaxValue);
 
         // Assert
-        Assert.Throws<OverflowException>(act);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(OrderRejectionReason.OrderValueTooLarge, result.RejectionReason);
         Assert.Equal(before, GetAccount(service, buyerId));
         Assert.Empty(service.GetActiveOrders(buyerId));
     }

@@ -99,9 +99,16 @@ public sealed class AccountTradingService
 
         if (command.Side == OrderSide.Buy)
         {
-            reservedCash = command.Type == OrderType.Limit
-                ? checked(command.Price!.Value * command.Size)
-                : GetMarketBuyQuote(command.Size).Cost;
+            try
+            {
+                reservedCash = command.Type == OrderType.Limit
+                    ? checked(command.Price!.Value * command.Size)
+                    : GetMarketBuyQuote(command.Size).Cost;
+            }
+            catch (OverflowException)
+            {
+                return RejectOrder(OrderRejectionReason.OrderValueTooLarge);
+            }
             
             if (reservedCash > 0 && !account.TryReserveCash(reservedCash))
                 return RejectOrder(OrderRejectionReason.InsufficientAvailableCash);
