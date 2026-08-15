@@ -5,11 +5,16 @@
         <RootNamespace>exchange_simulator.Server</RootNamespace>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-    </PropertyGroup>
+      <UserSecretsId>294fba4a-c8df-4cbd-9338-6162b36d5912</UserSecretsId>
+  </PropertyGroup>
     
     <ItemGroup>
         <ProjectReference Include="..\exchange-simulator\exchange-simulator.csproj" />
         <ProjectReference Include="..\exchange-simulator.Contracts\exchange-simulator.Contracts.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     </ItemGroup>
 
     <ItemGroup>
