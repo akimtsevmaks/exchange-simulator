@@ -5,7 +5,7 @@ namespace exchange_simulator.Models.AccountTrading;
 
 public class TradingAccount
 {
-    private readonly List<AccountOperation> _operations = [];
+    private readonly List<AccountOperation> _operations;
     private readonly decimal _initialInstrumentPrice;
     
     public Guid Id { get; }
@@ -15,16 +15,95 @@ public class TradingAccount
     public decimal AvailableCash =>  CashBalance - ReservedCash;
     
     public Position Position { get; }
+    
+    public TradingAccount(Guid id, Instrument instrument) 
+        : this(id, instrument, CreateEmptyPosition(instrument), 0, 0, []) { }
 
-    public TradingAccount(Guid id, Instrument instrument)
+    private TradingAccount(
+        Guid id,
+        Instrument instrument,
+        Position position,
+        decimal cashBalance,
+        decimal reservedCash,
+        IReadOnlyList<AccountOperation> operations)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("invalid account ID", nameof(id));
+        
         ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentNullException.ThrowIfNull(position);
+        ArgumentNullException.ThrowIfNull(operations);
+        
+        ArgumentOutOfRangeException.ThrowIfNegative(cashBalance);
+        ArgumentOutOfRangeException.ThrowIfNegative(reservedCash);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(reservedCash, cashBalance);
+        
+        if (position.InstrumentId != instrument.Id)
+            throw new ArgumentException("instrument position does not match position instrument", nameof(position));
+        
         
         Id = id;
         _initialInstrumentPrice = instrument.InitialPrice;
-        Position = new Position(instrument.Id);
+        CashBalance = cashBalance;
+        ReservedCash = reservedCash;
+        Position = position;
+        _operations = [..operations];
+    }
+
+    internal static TradingAccount Restore(TradingAccountRestoreState state, Instrument instrument)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentNullException.ThrowIfNull(state.Snapshot);
+        ArgumentNullException.ThrowIfNull(state.Snapshot.Position);
+        ArgumentNullException.ThrowIfNull(state.Operations);
+        
+        var snapshot = state.Snapshot;
+        
+        ArgumentOutOfRangeException.ThrowIfNegative(snapshot.CashBalance);
+        ArgumentOutOfRangeException.ThrowIfNegative(snapshot.ReservedCash);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(snapshot.ReservedCash, snapshot.CashBalance);
+        
+        if (snapshot.AvailableCash != snapshot.CashBalance - snapshot.ReservedCash)
+            throw new ArgumentException("available cash does not match balance and reserve", nameof(state));
+        if (snapshot.Position.InstrumentId != instrument.Id)
+            throw new ArgumentException("restored instrument position does not match position instrument", nameof(state));
+        
+        var operations = state.Operations.ToArray();
+        var operationIds = new HashSet<Guid>();
+
+ 
+        foreach (var operation in operations)
+        {
+            if (operation is null)
+                throw new ArgumentException("account operations cannot contain null", nameof(state));
+            if (operation.Id == Guid.Empty)
+                throw new ArgumentException("account operation ID cannot be empty", nameof(state));
+            if (!operationIds.Add(operation.Id))
+                throw new ArgumentException($"duplicate account operation {operation.Id}", nameof(state));
+            if (operation.AccountId != snapshot.Id)
+                throw new ArgumentException("account operation belongs to another account", nameof(state));
+            if (!Enum.IsDefined(operation.Type))
+                throw new ArgumentException("account operation type is invalid", nameof(state));
+            if (operation.InstrumentId == Guid.Empty || operation.OrderId == Guid.Empty || operation.TradeId == Guid.Empty)
+                throw new ArgumentException("account operation contains an empty reference", nameof(state));
+            if (operation.InstrumentId.HasValue && operation.InstrumentId.Value != instrument.Id)
+                throw new ArgumentException("account operation references another instrument", nameof(state));
+        }
+        
+        return new TradingAccount(
+            snapshot.Id,
+            instrument,
+            Position.Restore(snapshot.Position),
+            snapshot.CashBalance,
+            snapshot.ReservedCash,
+            operations);
+    }
+
+    private static Position CreateEmptyPosition(Instrument instrument)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        return new Position(instrument.Id);
     }
 
     public AccountOperation GrantInitialCash(decimal amount)

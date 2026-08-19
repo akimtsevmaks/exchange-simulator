@@ -9,13 +9,42 @@ public sealed class Position
     public long AvailableQuantity => Quantity - ReservedQuantity;
     
     public decimal AveragePrice { get; private set; }
+    
+    internal Position(Guid instrumentId) : this(instrumentId, 0, 0, 0) { }
 
-    internal Position(Guid instrumentId)
+    private Position(Guid instrumentId, long quantity, long reservedQuantity, decimal averagePrice)
     {
         if (instrumentId == Guid.Empty)
             throw new ArgumentException("invalid instrument ID", nameof(instrumentId));
         
+        ArgumentOutOfRangeException.ThrowIfNegative(quantity);
+        ArgumentOutOfRangeException.ThrowIfNegative(reservedQuantity);
+        
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(reservedQuantity, quantity);
+        
+        if ((quantity == 0 && averagePrice != 0) || (quantity > 0 && averagePrice <= 0))
+            throw new ArgumentOutOfRangeException(nameof(averagePrice));
+        
         InstrumentId = instrumentId;
+        Quantity = quantity;
+        ReservedQuantity = reservedQuantity;
+        AveragePrice = averagePrice;
+    }
+
+    internal static Position Restore(PositionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var position = new Position(
+            snapshot.InstrumentId,
+            snapshot.Quantity,
+            snapshot.ReservedQuantity,
+            snapshot.AveragePrice);
+        
+        if (snapshot.AvailableQuantity != position.AvailableQuantity)
+            throw new ArgumentException("available quantity doesn't match quantity", nameof(snapshot));
+
+        return position;
     }
 
     internal void GrantInitialQuantity(long quantity, decimal price)
