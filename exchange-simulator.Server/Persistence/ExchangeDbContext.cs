@@ -42,6 +42,7 @@ internal sealed class ExchangeDbContext(
         ConfigureTradingWorld(modelBuilder);
         ConfigureInstrument(modelBuilder);
         ConfigureTradingAccount(modelBuilder);
+        ConfigureBotAccount(modelBuilder);
     }
 
     private static void ConfigureTradingWorld(ModelBuilder modelBuilder)
@@ -145,4 +146,42 @@ internal sealed class ExchangeDbContext(
             .HasForeignKey(account => account.WorldId)
             .OnDelete(DeleteBehavior.Restrict);
     }
+    
+    private static void ConfigureBotAccount(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<BotAccountEntity>();
+
+        entity.ToTable("BotAccounts", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_BotAccounts_Kind_Valid",
+                "\"Kind\" IN ('MarketMaker', 'NoiseBot')");
+        });
+
+        entity.HasKey(bot => new { bot.WorldId, bot.Kind });
+
+        entity.Property(bot => bot.Kind)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
+        entity.HasIndex(bot => bot.AccountId)
+            .IsUnique();
+
+        entity.HasOne<TradingWorldEntity>()
+            .WithMany()
+            .HasForeignKey(bot => bot.WorldId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<TradingAccountEntity>()
+            .WithMany()
+            .HasForeignKey(bot => bot.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+    
+    
+    
+    
+    
+    
+    
 }
