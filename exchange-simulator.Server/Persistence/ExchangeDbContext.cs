@@ -46,6 +46,7 @@ internal sealed class ExchangeDbContext(
         ConfigurePosition(modelBuilder);
         ConfigureOrder(modelBuilder);
         ConfigureTrade(modelBuilder);
+        ConfigureOrderHistory(modelBuilder);
     }
 
     private static void ConfigureTradingWorld(ModelBuilder modelBuilder)
@@ -357,4 +358,58 @@ internal sealed class ExchangeDbContext(
             .OnDelete(DeleteBehavior.Restrict);
     }
     
+    private static void ConfigureOrderHistory(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<OrderHistoryEntryEntity>();
+
+        entity.ToTable("OrderHistoryEntries", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_OrderHistoryEntries_SequenceNumber_Positive",
+                "\"SequenceNumber\" > 0");
+
+            table.HasCheckConstraint(
+                "CK_OrderHistoryEntries_EventType_Valid",
+                "\"EventType\" IN " +
+                "('Accepted', 'Activated', 'PartiallyFilled', 'Filled', 'Cancelled')");
+
+            table.HasCheckConstraint(
+                "CK_OrderHistoryEntries_Sizes_NonNegative",
+                "\"FilledSize\" >= 0 AND \"RemainingSize\" >= 0");
+
+            table.HasCheckConstraint(
+                "CK_OrderHistoryEntries_Trade_Valid",
+                "(\"EventType\" IN ('PartiallyFilled', 'Filled') AND \"TradeId\" IS NOT NULL)" +
+                " OR " +
+                "(\"EventType\" IN ('Accepted', 'Activated', 'Cancelled') AND \"TradeId\" IS NULL)");
+        });
+
+        entity.HasKey(history => history.SequenceNumber);
+
+        entity.Property(history => history.SequenceNumber)
+            .UseIdentityByDefaultColumn();
+
+        entity.Property(history => history.EventType)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
+        entity.Property(history => history.OccurredAt)
+            .HasColumnType("timestamp with time zone");
+
+        entity.HasIndex(history => new
+        {
+            history.OrderId,
+            history.SequenceNumber
+        });
+
+        entity.HasOne<OrderEntity>()
+            .WithMany()
+            .HasForeignKey(history => history.OrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<TradeEntity>()
+            .WithMany()
+            .HasForeignKey(history => history.TradeId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
 }
