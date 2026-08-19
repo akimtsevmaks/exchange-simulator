@@ -38,8 +38,10 @@ internal sealed class ExchangeDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        
         ConfigureTradingWorld(modelBuilder);
         ConfigureInstrument(modelBuilder);
+        ConfigureTradingAccount(modelBuilder);
     }
 
     private static void ConfigureTradingWorld(ModelBuilder modelBuilder)
@@ -111,6 +113,36 @@ internal sealed class ExchangeDbContext(
         entity.HasOne<TradingWorldEntity>()
             .WithMany()
             .HasForeignKey(instrument => instrument.WorldId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+    
+    private static void ConfigureTradingAccount(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<TradingAccountEntity>();
+
+        entity.ToTable("TradingAccounts", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_TradingAccounts_CashBalance_NonNegative",
+                "\"CashBalance\" >= 0");
+
+            table.HasCheckConstraint(
+                "CK_TradingAccounts_ReservedCash_Valid",
+                "\"ReservedCash\" >= 0 AND \"ReservedCash\" <= \"CashBalance\"");
+        });
+
+        entity.HasKey(account => account.Id);
+        entity.Property(account => account.Id)
+            .ValueGeneratedNever();
+
+        entity.Property(account => account.CashBalance)
+            .HasColumnType("numeric");
+        entity.Property(account => account.ReservedCash)
+            .HasColumnType("numeric");
+
+        entity.HasOne<TradingWorldEntity>()
+            .WithMany()
+            .HasForeignKey(account => account.WorldId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
