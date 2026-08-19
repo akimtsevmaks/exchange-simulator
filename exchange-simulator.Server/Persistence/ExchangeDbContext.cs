@@ -45,6 +45,7 @@ internal sealed class ExchangeDbContext(
         ConfigureBotAccount(modelBuilder);
         ConfigurePosition(modelBuilder);
         ConfigureOrder(modelBuilder);
+        ConfigureTrade(modelBuilder);
     }
 
     private static void ConfigureTradingWorld(ModelBuilder modelBuilder)
@@ -300,6 +301,60 @@ internal sealed class ExchangeDbContext(
             .OnDelete(DeleteBehavior.Restrict);
     }
     
-    
+    private static void ConfigureTrade(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<TradeEntity>();
+
+        entity.ToTable("Trades", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Trades_SequenceNumber_Positive",
+                "\"SequenceNumber\" > 0");
+
+            table.HasCheckConstraint(
+                "CK_Trades_Price_Positive",
+                "\"Price\" > 0");
+
+            table.HasCheckConstraint(
+                "CK_Trades_Size_Positive",
+                "\"Size\" > 0");
+
+            table.HasCheckConstraint(
+                "CK_Trades_DifferentOrders",
+                "\"BuyOrderId\" <> \"SellOrderId\"");
+        });
+
+        entity.HasKey(trade => trade.Id);
+
+        entity.Property(trade => trade.Id)
+            .ValueGeneratedNever();
+
+        entity.Property(trade => trade.SequenceNumber)
+            .UseIdentityByDefaultColumn();
+
+        entity.Property(trade => trade.Price)
+            .HasColumnType("numeric");
+
+        entity.Property(trade => trade.ExecutedAt)
+            .HasColumnType("timestamp with time zone");
+
+        entity.HasIndex(trade => trade.SequenceNumber)
+            .IsUnique();
+
+        entity.HasOne<InstrumentEntity>()
+            .WithMany()
+            .HasForeignKey(trade => trade.InstrumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<OrderEntity>()
+            .WithMany()
+            .HasForeignKey(trade => trade.BuyOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<OrderEntity>()
+            .WithMany()
+            .HasForeignKey(trade => trade.SellOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
     
 }
