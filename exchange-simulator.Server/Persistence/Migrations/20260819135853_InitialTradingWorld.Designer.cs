@@ -12,7 +12,7 @@ using exchange_simulator.Server.Persistence;
 namespace exchange_simulator.Server.Persistence.Migrations
 {
     [DbContext(typeof(ExchangeDbContext))]
-    [Migration("20260819131330_InitialTradingWorld")]
+    [Migration("20260819135853_InitialTradingWorld")]
     partial class InitialTradingWorld
     {
         /// <inheritdoc />
@@ -269,11 +269,11 @@ namespace exchange_simulator.Server.Persistence.Migrations
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("InstrumentId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("AveragePrice")
                         .HasColumnType("numeric");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid");
 
                     b.Property<long>("Quantity")
                         .HasColumnType("bigint");
@@ -281,7 +281,7 @@ namespace exchange_simulator.Server.Persistence.Migrations
                     b.Property<long>("ReservedQuantity")
                         .HasColumnType("bigint");
 
-                    b.HasKey("AccountId", "InstrumentId");
+                    b.HasKey("AccountId");
 
                     b.HasIndex("InstrumentId");
 
@@ -421,8 +421,8 @@ namespace exchange_simulator.Server.Persistence.Migrations
             modelBuilder.Entity("exchange_simulator.Server.Persistence.Entities.BotAccountEntity", b =>
                 {
                     b.HasOne("exchange_simulator.Server.Persistence.Entities.TradingAccountEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId")
+                        .WithOne()
+                        .HasForeignKey("exchange_simulator.Server.Persistence.Entities.BotAccountEntity", "AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -436,8 +436,8 @@ namespace exchange_simulator.Server.Persistence.Migrations
             modelBuilder.Entity("exchange_simulator.Server.Persistence.Entities.InstrumentEntity", b =>
                 {
                     b.HasOne("exchange_simulator.Server.Persistence.Entities.TradingWorldEntity", null)
-                        .WithMany()
-                        .HasForeignKey("WorldId")
+                        .WithOne()
+                        .HasForeignKey("exchange_simulator.Server.Persistence.Entities.InstrumentEntity", "WorldId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -474,8 +474,8 @@ namespace exchange_simulator.Server.Persistence.Migrations
             modelBuilder.Entity("exchange_simulator.Server.Persistence.Entities.PositionEntity", b =>
                 {
                     b.HasOne("exchange_simulator.Server.Persistence.Entities.TradingAccountEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId")
+                        .WithOne()
+                        .HasForeignKey("exchange_simulator.Server.Persistence.Entities.PositionEntity", "AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

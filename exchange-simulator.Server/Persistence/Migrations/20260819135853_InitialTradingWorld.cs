@@ -152,7 +152,7 @@ namespace exchange_simulator.Server.Persistence.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Positions", x => new { x.AccountId, x.InstrumentId });
+                    table.PrimaryKey("PK_Positions", x => x.AccountId);
                     table.CheckConstraint("CK_Positions_AveragePrice_Valid", "(\"Quantity\" = 0 AND \"AveragePrice\" = 0) OR (\"Quantity\" > 0 AND \"AveragePrice\" > 0)");
                     table.CheckConstraint("CK_Positions_Quantity_NonNegative", "\"Quantity\" >= 0");
                     table.CheckConstraint("CK_Positions_ReservedQuantity_Valid", "\"ReservedQuantity\" >= 0 AND \"ReservedQuantity\" <= \"Quantity\"");
