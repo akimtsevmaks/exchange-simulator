@@ -221,84 +221,84 @@ internal sealed class ExchangeDbContext(
     }
     
     private static void ConfigureOrder(ModelBuilder modelBuilder)
-{
-    var entity = modelBuilder.Entity<OrderEntity>();
-
-    entity.ToTable("Orders", table =>
     {
-        table.HasCheckConstraint(
-            "CK_Orders_Type_Valid",
-            "\"Type\" IN ('Market', 'Limit')");
+        var entity = modelBuilder.Entity<OrderEntity>();
 
-        table.HasCheckConstraint(
-            "CK_Orders_Side_Valid",
-            "\"Side\" IN ('Buy', 'Sell')");
+        entity.ToTable("Orders", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Orders_Type_Valid",
+                "\"Type\" IN ('Market', 'Limit')");
 
-        table.HasCheckConstraint(
-            "CK_Orders_Status_Valid",
-            "\"Status\" IN ('Active', 'Filled', 'Cancelled')");
+            table.HasCheckConstraint(
+                "CK_Orders_Side_Valid",
+                "\"Side\" IN ('Buy', 'Sell')");
 
-        table.HasCheckConstraint(
-            "CK_Orders_Size_Valid",
-            "\"Size\" > 0 AND \"RemainingSize\" >= 0 AND \"RemainingSize\" <= \"Size\"");
+            table.HasCheckConstraint(
+                "CK_Orders_Status_Valid",
+                "\"Status\" IN ('Active', 'Filled', 'Cancelled')");
 
-        table.HasCheckConstraint(
-            "CK_Orders_Price_Valid",
-            "(\"Type\" = 'Limit' AND \"Price\" IS NOT NULL AND \"Price\" > 0) OR " +
-            "(\"Type\" = 'Market' AND \"Price\" IS NULL)");
+            table.HasCheckConstraint(
+                "CK_Orders_Size_Valid",
+                "\"Size\" > 0 AND \"RemainingSize\" >= 0 AND \"RemainingSize\" <= \"Size\"");
 
-        table.HasCheckConstraint(
-            "CK_Orders_Status_RemainingSize",
-            "(\"Status\" = 'Filled' AND \"RemainingSize\" = 0) OR " +
-            "(\"Status\" IN ('Active', 'Cancelled') AND \"RemainingSize\" > 0)");
+            table.HasCheckConstraint(
+                "CK_Orders_Price_Valid",
+                "(\"Type\" = 'Limit' AND \"Price\" IS NOT NULL AND \"Price\" > 0) OR " +
+                "(\"Type\" = 'Market' AND \"Price\" IS NULL)");
 
-        table.HasCheckConstraint(
-            "CK_Orders_Active_IsLimit",
-            "\"Status\" <> 'Active' OR \"Type\" = 'Limit'");
-    });
+            table.HasCheckConstraint(
+                "CK_Orders_Status_RemainingSize",
+                "(\"Status\" = 'Filled' AND \"RemainingSize\" = 0) OR " +
+                "(\"Status\" IN ('Active', 'Cancelled') AND \"RemainingSize\" > 0)");
 
-    entity.HasKey(order => order.Id);
+            table.HasCheckConstraint(
+                "CK_Orders_Active_IsLimit",
+                "\"Status\" <> 'Active' OR \"Type\" = 'Limit'");
+        });
 
-    entity.Property(order => order.Id)
-        .ValueGeneratedNever();
+        entity.HasKey(order => order.Id);
 
-    entity.Property(order => order.Type)
-        .HasConversion<string>()
-        .HasMaxLength(16);
+        entity.Property(order => order.Id)
+            .ValueGeneratedNever();
 
-    entity.Property(order => order.Side)
-        .HasConversion<string>()
-        .HasMaxLength(16);
+        entity.Property(order => order.Type)
+            .HasConversion<string>()
+            .HasMaxLength(16);
 
-    entity.Property(order => order.Status)
-        .HasConversion<string>()
-        .HasMaxLength(16);
+        entity.Property(order => order.Side)
+            .HasConversion<string>()
+            .HasMaxLength(16);
 
-    entity.Property(order => order.Price)
-        .HasColumnType("numeric");
+        entity.Property(order => order.Status)
+            .HasConversion<string>()
+            .HasMaxLength(16);
 
-    entity.Property(order => order.CreatedAt)
-        .HasColumnType("timestamp with time zone");
+        entity.Property(order => order.Price)
+            .HasColumnType("numeric");
 
-    entity.HasIndex(order => new
-    {
-        order.OwnerAccountId,
-        order.CreatedAt
-    });
+        entity.Property(order => order.CreatedAt)
+            .HasColumnType("timestamp with time zone");
 
-    entity.HasIndex(order => order.Status)
-        .HasFilter("\"Status\" = 'Active'");
+        entity.HasIndex(order => new
+        {
+            order.OwnerAccountId,
+            order.CreatedAt
+        });
 
-    entity.HasOne<TradingAccountEntity>()
-        .WithMany()
-        .HasForeignKey(order => order.OwnerAccountId)
-        .OnDelete(DeleteBehavior.Restrict);
+        entity.HasIndex(order => order.Status)
+            .HasFilter("\"Status\" = 'Active'");
 
-    entity.HasOne<InstrumentEntity>()
-        .WithMany()
-        .HasForeignKey(order => order.InstrumentId)
-        .OnDelete(DeleteBehavior.Restrict);
-}
+        entity.HasOne<TradingAccountEntity>()
+            .WithMany()
+            .HasForeignKey(order => order.OwnerAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<InstrumentEntity>()
+            .WithMany()
+            .HasForeignKey(order => order.InstrumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
     
     
     
