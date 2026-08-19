@@ -113,12 +113,9 @@ internal sealed class ExchangeDbContext(
         entity.Property(instrument => instrument.InitialPrice)
             .HasColumnType("numeric");
 
-        entity.HasIndex(instrument => instrument.WorldId)
-            .IsUnique();
-
         entity.HasOne<TradingWorldEntity>()
-            .WithMany()
-            .HasForeignKey(instrument => instrument.WorldId)
+            .WithOne()
+            .HasForeignKey<InstrumentEntity>(instrument => instrument.WorldId)
             .OnDelete(DeleteBehavior.Restrict);
     }
     
@@ -168,18 +165,15 @@ internal sealed class ExchangeDbContext(
         entity.Property(bot => bot.Kind)
             .HasConversion<string>()
             .HasMaxLength(32);
-
-        entity.HasIndex(bot => bot.AccountId)
-            .IsUnique();
-
+        
         entity.HasOne<TradingWorldEntity>()
             .WithMany()
             .HasForeignKey(bot => bot.WorldId)
             .OnDelete(DeleteBehavior.Restrict);
 
         entity.HasOne<TradingAccountEntity>()
-            .WithMany()
-            .HasForeignKey(bot => bot.AccountId)
+            .WithOne()
+            .HasForeignKey<BotAccountEntity>(bot => bot.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
     }
     
@@ -203,18 +197,17 @@ internal sealed class ExchangeDbContext(
                 "(\"Quantity\" > 0 AND \"AveragePrice\" > 0)");
         });
 
-        entity.HasKey(position => new
-        {
-            position.AccountId,
-            position.InstrumentId
-        });
+        entity.HasKey(position => position.AccountId);
 
+        entity.Property(position => position.AccountId)
+            .ValueGeneratedNever();
+        
         entity.Property(position => position.AveragePrice)
             .HasColumnType("numeric");
 
         entity.HasOne<TradingAccountEntity>()
-            .WithMany()
-            .HasForeignKey(position => position.AccountId)
+            .WithOne()
+            .HasForeignKey<PositionEntity>(position => position.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
         entity.HasOne<InstrumentEntity>()
