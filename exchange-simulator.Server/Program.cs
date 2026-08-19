@@ -1,6 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using exchange_simulator.Server.Persistence;
+using Microsoft.EntityFrameworkCore;
+
 using exchange_simulator.Bots;
 using exchange_simulator.Models.TradingCore;
 using exchange_simulator.Server;
@@ -19,6 +22,12 @@ builder.Services.ConfigureHttpJsonOptions(option =>
 
 builder.Services.Configure<RouteHandlerOptions>(options =>
     options.ThrowOnBadRequest = true);
+
+builder.Services.AddDbContext<ExchangeDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("ExchangeDatabase") ??
+        throw new InvalidOperationException(
+            "Connection string 'ExchangeDatabase' is not configured")));
 
 builder.Services.AddSingleton(CreateMarket());
 builder.Services.AddSingleton<TestParticipant>();
