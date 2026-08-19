@@ -17,6 +17,62 @@ public class TradingEngine
         _orderBook = new OrderBook(Instrument);
     }
     
+    internal static TradingEngine Restore(
+        Instrument instrument,
+        IReadOnlyList<OrderSnapshot> orders,
+        IReadOnlyList<Trade> trades)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentNullException.ThrowIfNull(orders);
+        ArgumentNullException.ThrowIfNull(trades);
+
+        var engine = new TradingEngine(instrument);
+
+        foreach (var snapshot in orders)
+        {
+            if (snapshot is null)
+                throw new ArgumentException("orders cannot contain null", nameof(orders));
+
+            var order = Order.Restore(snapshot, instrument);
+
+            if (!engine._orders.TryAdd(order.Id, order))
+                throw new ArgumentException($"duplicate order {order.Id}", nameof(orders));
+
+            if (order.Status == OrderStatus.Active)
+                engine._orderBook.RestoreActiveOrder(order);
+        }
+
+        var tradeIds = new HashSet<Guid>();
+
+        foreach (var trade in trades)
+        {
+            if (trade is null)
+                throw new ArgumentException("trades cannot contain null", nameof(trades));
+            if (trade.Id == Guid.Empty)
+                throw new ArgumentException("trade ID cannot be empty", nameof(trades));
+            if (!tradeIds.Add(trade.Id))
+                throw new ArgumentException($"duplicate trade {trade.Id}", nameof(trades));
+            if (trade.InstrumentId != instrument.Id)
+                throw new ArgumentException("trade instrument does not match the restored instrument", nameof(trades));
+            if (trade.BuyOrderId == Guid.Empty || trade.SellOrderId == Guid.Empty)
+                throw new ArgumentException("trade order ID cannot be empty", nameof(trades));
+            if (trade.BuyOrderId == trade.SellOrderId)
+                throw new ArgumentException("trade must reference two different orders", nameof(trades));
+            if (trade.Price <= 0)
+                throw new ArgumentException("trade price must be positive", nameof(trades));
+            if (trade.Size <= 0 || trade.Size % instrument.LotSize != 0)
+                throw new ArgumentException("trade size is invalid", nameof(trades));
+            if (!engine._orders.TryGetValue(trade.BuyOrderId, out var buyOrder) || buyOrder.Side != OrderSide.Buy)
+                throw new ArgumentException("trade references an invalid buy order", nameof(trades));
+            if (!engine._orders.TryGetValue(trade.SellOrderId, out var sellOrder) || sellOrder.Side != OrderSide.Sell)
+                throw new ArgumentException("trade references an invalid sell order", nameof(trades));
+
+            engine._trades.Add(trade);
+        }
+
+        return engine;
+    }
+    
     public OrderCommandResult PlaceOrder(PlaceOrderCommand command) =>
         PlaceOrder(command, static _ => { });
 

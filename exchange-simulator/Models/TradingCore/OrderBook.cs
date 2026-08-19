@@ -172,14 +172,42 @@ public class OrderBook
     private void AddOrder(Order order)
     {
         if (order.Type != OrderType.Limit || !order.Price.HasValue || order.RemainingSize <= 0)
-            throw new InvalidOperationException("Only an unfilled limit order can be processed.");
+            throw new InvalidOperationException("Only an unfilled limit order can be processed");
         
+        if (order.Status != OrderStatus.Created)
+            throw new InvalidOperationException("Only a created order can be activated");
+        
+        AddRestingOrder(order);
+        order.Activate();
+    }
+
+    internal void RestoreActiveOrder(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        
+        if (order.Instrument.Id != Instrument.Id)
+            throw new ArgumentException($"Instrument {order.Instrument.Id} does not match {Instrument.Id}", nameof(order));
+        
+        if (order.Status != OrderStatus.Active)
+            throw new ArgumentException("Only an active order can be restored to the order book", nameof(order));
+        
+        if (order.Type != OrderType.Limit || !order.Price.HasValue || order.RemainingSize <= 0)
+            throw new ArgumentException("Only an unfilled limit order can be restored", nameof(order));
+        
+        AddRestingOrder(order);
+    }
+
+
+    private void AddRestingOrder(Order order)
+    {
         if (_ordersById.ContainsKey(order.Id))
             throw new InvalidOperationException($"Order {order.Id} already exists");
         
         var sameSideLevels = order.Side ==  OrderSide.Buy ? _bids : _asks;
         
-        var price = order.Price.Value;
+        var price = order.Price ??
+                    throw new InvalidOperationException($"a resting order must have a limit price");
+        
         if (!sameSideLevels.TryGetValue(price, out var level))
         {
             level = new PriceLevel(price);
@@ -189,7 +217,6 @@ public class OrderBook
         var node = level.Orders.AddLast(order);
         
         _ordersById.Add(order.Id, new OrderLocation(level, node, order.Side));
-        order.Activate();
     }
 
     public bool CancelOrder(Guid orderId)
@@ -209,23 +236,4 @@ public class OrderBook
         return true;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
