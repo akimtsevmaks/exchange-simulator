@@ -47,6 +47,7 @@ internal sealed class ExchangeDbContext(
         ConfigureOrder(modelBuilder);
         ConfigureTrade(modelBuilder);
         ConfigureOrderHistory(modelBuilder);
+        ConfigureAccountOperation(modelBuilder);
     }
 
     private static void ConfigureTradingWorld(ModelBuilder modelBuilder)
@@ -410,6 +411,110 @@ internal sealed class ExchangeDbContext(
         entity.HasOne<TradeEntity>()
             .WithMany()
             .HasForeignKey(history => history.TradeId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+    
+    private static void ConfigureAccountOperation(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<AccountOperationEntity>();
+
+        entity.ToTable("AccountOperations", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_AccountOperations_SequenceNumber_Positive",
+                "\"SequenceNumber\" > 0");
+
+            table.HasCheckConstraint(
+                "CK_AccountOperations_Type_Valid",
+                "\"Type\" IN " +
+                "('InitialCashGranted', 'InitialInstrumentsGranted', 'TradeBuy', 'TradeSell')");
+
+            table.HasCheckConstraint(
+                "CK_AccountOperations_Payload_Valid",
+
+                "(\"Type\" = 'InitialCashGranted' " +
+                "AND \"CashChange\" > 0 " +
+                "AND \"InstrumentId\" IS NULL " +
+                "AND \"InstrumentQuantityChange\" = 0 " +
+                "AND \"OrderId\" IS NULL " +
+                "AND \"TradeId\" IS NULL) OR " +
+
+                "(\"Type\" = 'InitialInstrumentsGranted' " +
+                "AND \"CashChange\" = 0 " +
+                "AND \"InstrumentId\" IS NOT NULL " +
+                "AND \"InstrumentQuantityChange\" > 0 " +
+                "AND \"OrderId\" IS NULL " +
+                "AND \"TradeId\" IS NULL) OR " +
+
+                "(\"Type\" = 'TradeBuy' " +
+                "AND \"CashChange\" < 0 " +
+                "AND \"InstrumentId\" IS NOT NULL " +
+                "AND \"InstrumentQuantityChange\" > 0 " +
+                "AND \"OrderId\" IS NOT NULL " +
+                "AND \"TradeId\" IS NOT NULL) OR " +
+
+                "(\"Type\" = 'TradeSell' " +
+                "AND \"CashChange\" > 0 " +
+                "AND \"InstrumentId\" IS NOT NULL " +
+                "AND \"InstrumentQuantityChange\" < 0 " +
+                "AND \"OrderId\" IS NOT NULL " +
+                "AND \"TradeId\" IS NOT NULL)");
+        });
+
+        entity.HasKey(operation => operation.Id);
+
+        entity.Property(operation => operation.Id)
+            .ValueGeneratedNever();
+
+        entity.Property(operation => operation.SequenceNumber)
+            .UseIdentityByDefaultColumn();
+
+        entity.Property(operation => operation.Type)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
+        entity.Property(operation => operation.CashChange)
+            .HasColumnType("numeric");
+
+        entity.Property(operation => operation.CreatedAt)
+            .HasColumnType("timestamp with time zone");
+
+        entity.HasIndex(operation => operation.SequenceNumber)
+            .IsUnique();
+
+        entity.HasIndex(operation => new
+        {
+            operation.AccountId,
+            operation.SequenceNumber
+        });
+
+        entity.HasIndex(operation => new
+        {
+            operation.AccountId,
+            operation.Type
+        })
+            .IsUnique()
+            .HasFilter(
+                "\"Type\" IN ('InitialCashGranted', 'InitialInstrumentsGranted')");
+
+        entity.HasOne<TradingAccountEntity>()
+            .WithMany()
+            .HasForeignKey(operation => operation.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<InstrumentEntity>()
+            .WithMany()
+            .HasForeignKey(operation => operation.InstrumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<OrderEntity>()
+            .WithMany()
+            .HasForeignKey(operation => operation.OrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<TradeEntity>()
+            .WithMany()
+            .HasForeignKey(operation => operation.TradeId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
