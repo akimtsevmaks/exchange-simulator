@@ -43,6 +43,7 @@ internal sealed class ExchangeDbContext(
         ConfigureInstrument(modelBuilder);
         ConfigureTradingAccount(modelBuilder);
         ConfigureBotAccount(modelBuilder);
+        ConfigurePosition(modelBuilder);
     }
 
     private static void ConfigureTradingWorld(ModelBuilder modelBuilder)
@@ -178,7 +179,45 @@ internal sealed class ExchangeDbContext(
             .OnDelete(DeleteBehavior.Restrict);
     }
     
-    
+    private static void ConfigurePosition(ModelBuilder modelBuilder)
+    {
+        var entity = modelBuilder.Entity<PositionEntity>();
+
+        entity.ToTable("Positions", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_Positions_Quantity_NonNegative",
+                "\"Quantity\" >= 0");
+
+            table.HasCheckConstraint(
+                "CK_Positions_ReservedQuantity_Valid",
+                "\"ReservedQuantity\" >= 0 AND \"ReservedQuantity\" <= \"Quantity\"");
+
+            table.HasCheckConstraint(
+                "CK_Positions_AveragePrice_Valid",
+                "(\"Quantity\" = 0 AND \"AveragePrice\" = 0) OR " +
+                "(\"Quantity\" > 0 AND \"AveragePrice\" > 0)");
+        });
+
+        entity.HasKey(position => new
+        {
+            position.AccountId,
+            position.InstrumentId
+        });
+
+        entity.Property(position => position.AveragePrice)
+            .HasColumnType("numeric");
+
+        entity.HasOne<TradingAccountEntity>()
+            .WithMany()
+            .HasForeignKey(position => position.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne<InstrumentEntity>()
+            .WithMany()
+            .HasForeignKey(position => position.InstrumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
     
     
     
