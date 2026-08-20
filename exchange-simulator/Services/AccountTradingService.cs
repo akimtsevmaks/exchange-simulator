@@ -10,13 +10,85 @@ public sealed class AccountTradingService
     private readonly TradingEngine _tradingEngine;
     private readonly Dictionary<Guid, TradingAccount> _accounts = [];
     private readonly Dictionary<Guid, List<OrderHistoryEntry>> _orderHistory = [];
+    private readonly List<OrderHistoryEntry> _orderHistoryEntries = [];
     
     public Instrument Instrument => _tradingEngine.Instrument;
 
-    public AccountTradingService(Instrument instrument)
+    public AccountTradingService(Instrument instrument) 
+        : this(new TradingEngine(instrument)) { }
+
+    private AccountTradingService(TradingEngine tradingEngine)
+    {
+        ArgumentNullException.ThrowIfNull(tradingEngine);
+        _tradingEngine = tradingEngine;
+    }
+
+    public static AccountTradingService Restore(Instrument instrument, AccountTradingRestoreState state)
     {
         ArgumentNullException.ThrowIfNull(instrument);
-        _tradingEngine = new TradingEngine(instrument);
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(state.Accounts);
+        ArgumentNullException.ThrowIfNull(state.Orders);
+        ArgumentNullException.ThrowIfNull(state.Trades);
+        ArgumentNullException.ThrowIfNull(state.OrderHistory);
+        
+        var accounts = state.Accounts.ToArray();
+        var orders = state.Orders.ToArray();
+        var trades = state.Trades.ToArray();
+        var orderHistory = state.OrderHistory.ToArray();
+
+        var service = new AccountTradingService(TradingEngine.Restore(instrument, orders, trades));
+        
+        
+        foreach (var accountState in accounts)
+        {
+            if (accountState is null)
+                throw new ArgumentException("accounts cannot contain null", nameof(state));
+
+            var account = TradingAccount.Restore(accountState, instrument);
+
+            if (!service._accounts.TryAdd(account.Id, account))
+                throw new ArgumentException($"duplicate account {account.Id}", nameof(state));
+        }
+        
+        
+        foreach (var order in orders)
+        {
+            if (!service._accounts.ContainsKey(order.OwnerId))
+                throw new ArgumentException($"order {order.Id} references a missing account", nameof(state));
+        }
+        
+        
+        foreach (var entry in orderHistory)
+        {
+            if (entry is null)
+                throw new ArgumentException("order history cannot contain null", nameof(state));
+            if (!service._tradingEngine.TryGetOrder(entry.OrderId, out var order))
+                throw new ArgumentException($"history references missing order {entry.OrderId}", nameof(state));
+
+            ValidateRestoredHistoryEntry(entry, order!);
+
+            if (!service._orderHistory.TryGetValue(entry.OrderId, out var history))
+            {
+                history = [];
+                service._orderHistory.Add(entry.OrderId, history);
+            }
+
+            history.Add(entry);
+            service._orderHistoryEntries.Add(entry);
+        }
+        
+        
+        foreach (var order in orders)
+        {
+            if (!service._orderHistory.TryGetValue(order.Id, out var history))
+                throw new ArgumentException($"order {order.Id} has no history", nameof(state));
+
+            ValidateRestoredOrderHistory(order, history);
+        }
+
+        
+        return service;
     }
 
     public TradingAccountSnapshot RegisterAccount(Guid accountId)
@@ -213,10 +285,8 @@ public sealed class AccountTradingService
     {
         GetAccount(accountId);
 
-        return _orderHistory
-            .Where(item => GetOrder(item.Key).OwnerId == accountId)
-            .SelectMany(item => item.Value)
-            .OrderBy(entry => entry.OccurredAt).ToArray();
+        return _orderHistoryEntries
+            .Where(entry => GetOrder(entry.OrderId).OwnerId == accountId).ToArray();
     }
 
     public IReadOnlyList<Trade> GetAccountTrades(Guid accountId)
@@ -338,16 +408,16 @@ public sealed class AccountTradingService
         var order = result.Order ??
                     throw new InvalidOperationException("Successful placement must return an order");
         
-        _orderHistory.Add(order.Id,
-            [
-            new OrderHistoryEntry(
-                order.Id,
-                OrderHistoryEventType.Accepted,
-                0,
-                order.Size,
-                null,
-                order.CreatedAt)
-            ]);
+        var acceptedEntry = new OrderHistoryEntry(
+            order.Id,
+            OrderHistoryEventType.Accepted,
+            0,
+            order.Size,
+            null,
+            order.CreatedAt);
+        
+        _orderHistory.Add(order.Id, [acceptedEntry]);
+        _orderHistoryEntries.Add(acceptedEntry);
 
         foreach (var trade in result.Trades)
         {
@@ -417,13 +487,63 @@ public sealed class AccountTradingService
         Guid? tradeId,
         DateTimeOffset occurredAt)
     {
-        GetHistory(orderId).Add(new OrderHistoryEntry(
+        var entry = new OrderHistoryEntry(
             orderId,
             eventType,
             filledSize,
             remainingSize,
             tradeId,
-            occurredAt));
+            occurredAt);
+        
+        GetHistory(orderId).Add(entry);
+        _orderHistoryEntries.Add(entry);
+    }
+    
+    private static void ValidateRestoredHistoryEntry(OrderHistoryEntry entry, OrderSnapshot order)
+    {
+        if (!Enum.IsDefined(entry.EventType))
+            throw new ArgumentException("order history event type is invalid", nameof(entry));
+        if (entry.FilledSize < 0 || entry.FilledSize > order.Size)
+            throw new ArgumentException("order history filled size is invalid", nameof(entry));
+        if (entry.RemainingSize < 0 || entry.RemainingSize > order.Size)
+            throw new ArgumentException("order history remaining size is invalid", nameof(entry));
+        if (entry.FilledSize != order.Size - entry.RemainingSize)
+            throw new ArgumentException("order history sizes do not match the order size", nameof(entry));
+        if (entry.TradeId == Guid.Empty)
+            throw new ArgumentException("order history contains an empty trade ID", nameof(entry));
+
+        var isTradeEvent = entry.EventType is OrderHistoryEventType.PartiallyFilled or OrderHistoryEventType.Filled;
+
+        if (isTradeEvent != entry.TradeId.HasValue)
+            throw new ArgumentException("order history trade reference does not match its event type", nameof(entry));
+    }
+    
+    private static void ValidateRestoredOrderHistory(OrderSnapshot order, IReadOnlyList<OrderHistoryEntry> history)
+    {
+        var first = history[0];
+
+        if (first.EventType != OrderHistoryEventType.Accepted ||
+            first.FilledSize != 0 ||
+            first.RemainingSize != order.Size ||
+            first.TradeId.HasValue)
+            throw new ArgumentException($"order {order.Id} history must start with acceptance", nameof(history));
+
+        var last = history[^1];
+
+        if (last.FilledSize != order.FilledSize ||
+            last.RemainingSize != order.RemainingSize)
+            throw new ArgumentException($"order {order.Id} history does not match its current size", nameof(history));
+
+        var finalEventMatchesStatus = order.OrderStatus switch
+        {
+            OrderStatus.Active => last.EventType is OrderHistoryEventType.Activated or OrderHistoryEventType.PartiallyFilled,
+            OrderStatus.Filled => last.EventType == OrderHistoryEventType.Filled,
+            OrderStatus.Cancelled => last.EventType == OrderHistoryEventType.Cancelled,
+            _ => false
+        };
+
+        if (!finalEventMatchesStatus)
+            throw new ArgumentException($"order {order.Id} history does not match its status", nameof(history));
     }
 
     private List<OrderHistoryEntry> GetHistory(Guid orderId)
