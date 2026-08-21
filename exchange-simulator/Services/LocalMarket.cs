@@ -41,6 +41,27 @@ public sealed class LocalMarket
                 noiseBotOptions))
     {
     }
+
+    public static LocalMarket Restore(
+        Instrument instrument,
+        AccountTradingRestoreState tradingState,
+        Guid marketMakerAccountId,
+        Guid noiseBotAccountId,
+        Guid manualAccountId,
+        TimeSpan stepInterval,
+        MarketMakerBotOptions marketMakerOptions,
+        NoiseBotOptions noiseBotOptions)
+    {
+        var tradingService = AccountTradingService.Restore(instrument, tradingState);
+
+        return new LocalMarket(
+            tradingService,
+            marketMakerAccountId,
+            noiseBotAccountId,
+            manualAccountId,
+            stepInterval,
+            CreateDefaultBotFactory(marketMakerOptions, noiseBotOptions));
+    }
     
     internal LocalMarket(
         Instrument instrument,
@@ -54,10 +75,7 @@ public sealed class LocalMarket
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCashPerAccount);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialInstrumentsPerAccount);
         
-        if (stepInterval < TimeSpan.FromMilliseconds(1) || 
-            stepInterval.TotalMilliseconds > uint.MaxValue - 1)
-            throw new ArgumentOutOfRangeException(nameof(stepInterval),
-                "Step interval is outside the supported range");
+        ValidateStepInterval(stepInterval);
         
         _accountTradingService = new AccountTradingService(instrument);
 
@@ -66,14 +84,45 @@ public sealed class LocalMarket
         ManualAccountId = RegisterParticipant(initialCashPerAccount, initialInstrumentsPerAccount);
         
         StepInterval = stepInterval;
-        _bots = botFactory(this).ToArray();
+        _bots = CreateBots(this, botFactory);
+    }
+
+    private LocalMarket(
+        AccountTradingService accountTradingService,
+        Guid marketMakerAccountId,
+        Guid noiseBotAccountId,
+        Guid manualAccountId,
+        TimeSpan stepInterval,
+        Func<LocalMarket, IReadOnlyList<ITradingBot>> botFactory)
+    {
+        ArgumentNullException.ThrowIfNull(accountTradingService);
+        ArgumentNullException.ThrowIfNull(botFactory);
         
-        if (_bots.Count == 0 || _bots.Any(bot => bot is null))
-        {
+        if (marketMakerAccountId == Guid.Empty)
+            throw new ArgumentException("invalid market maker account ID", nameof(marketMakerAccountId));
+        if (noiseBotAccountId == Guid.Empty)
+            throw new ArgumentException("invalid noise bot account ID", nameof(noiseBotAccountId));
+        if (manualAccountId == Guid.Empty)
+            throw new ArgumentException("invalid manual account ID", nameof(manualAccountId));
+        
+        if (marketMakerAccountId == noiseBotAccountId ||
+            marketMakerAccountId == manualAccountId ||
+            noiseBotAccountId == manualAccountId)
             throw new ArgumentException(
-                "At least one non-null bot must be provided",
-                nameof(botFactory));
-        }
+                "restored participant account IDs must be different");
+        
+        EnsureAccountExists(accountTradingService, marketMakerAccountId, nameof(marketMakerAccountId));
+        EnsureAccountExists(accountTradingService, noiseBotAccountId, nameof(noiseBotAccountId));
+        EnsureAccountExists(accountTradingService, manualAccountId, nameof(manualAccountId));
+        
+        ValidateStepInterval(stepInterval);
+
+        _accountTradingService = accountTradingService;
+        MarketMakerAccountId = marketMakerAccountId;
+        NoiseBotAccountId = noiseBotAccountId;
+        ManualAccountId = manualAccountId;
+        StepInterval = stepInterval;
+        _bots = CreateBots(this, botFactory);
     }
     
     private static Func<LocalMarket, IReadOnlyList<ITradingBot>> CreateDefaultBotFactory(
@@ -97,6 +146,38 @@ public sealed class LocalMarket
                 noiseBotOptions.MaxOrderLots,
                 noiseBotOptions.MaxActiveOrders)
         ];
+    }
+
+    private static void EnsureAccountExists(
+        AccountTradingService accountTradingService,
+        Guid accountId,
+        string parameterName)
+    {
+        if (!accountTradingService.TryGetAccount(accountId, out _))
+            throw new ArgumentException($"Account {accountId} is not registered", parameterName);
+    }
+
+    private static IReadOnlyList<ITradingBot> CreateBots(
+        LocalMarket market,
+        Func<LocalMarket, IReadOnlyList<ITradingBot>> botFactory)
+    {
+        var bots = botFactory(market) ??
+                   throw new ArgumentException("Bot factory returned null", nameof(botFactory));
+        
+        var result = bots.ToArray();
+
+        if (result.Length == 0 || result.Any(bot => bot is null))
+            throw new ArgumentException("At least one non-null bot must be provided");
+
+        return result;
+    }
+    
+    private static void ValidateStepInterval(TimeSpan stepInterval)
+    {
+        if (stepInterval < TimeSpan.FromMilliseconds(1) || 
+            stepInterval.TotalMilliseconds > uint.MaxValue - 1)
+            throw new ArgumentOutOfRangeException(nameof(stepInterval),
+                "Step interval is outside the supported range");
     }
 
     public void Step()
