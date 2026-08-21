@@ -4,5 +4,6 @@ public enum LocalMarketStatus
 {
     Created,
     Running,
-    Stopped
+    Stopped,
+    Faulted
 }

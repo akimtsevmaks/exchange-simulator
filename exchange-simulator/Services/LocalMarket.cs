@@ -22,7 +22,17 @@ public sealed class LocalMarket
     public Guid NoiseBotAccountId { get; }
     public Guid ManualAccountId { get; }
     private TimeSpan StepInterval { get; }
-    public LocalMarketStatus Status => Execute(() => _status);
+
+    public LocalMarketStatus Status
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _status;
+            }
+        }
+    }
     
     public LocalMarket(
         Instrument instrument,
@@ -184,6 +194,8 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
+            
             if (_status == LocalMarketStatus.Stopped)
                 throw new InvalidOperationException(
                     "A stopped local market cannot execute new steps");
@@ -200,6 +212,8 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
+            
             if (_status != LocalMarketStatus.Created)
             {
                 throw new InvalidOperationException(
@@ -259,6 +273,8 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
+            
             if (_status != LocalMarketStatus.Created)
                 throw new InvalidOperationException("Restart policy can be applied only before the market starts");
             
@@ -282,6 +298,7 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
             return _accountTradingService.TryGetOrder(accountId, orderId, out snapshot);
         }
     }
@@ -290,6 +307,7 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
             return _accountTradingService.TryGetAccount(accountId, out snapshot);
         }
     }
@@ -319,6 +337,7 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
             if (!_accountTradingService.TryGetAccount(ManualAccountId, out var manualAccount))
             {
                 throw new InvalidOperationException(
@@ -338,10 +357,28 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
             var bot = _bots.FirstOrDefault(bot => bot.AccountId == botAccountId);
 
             return bot is not null && StopBot(bot);
         }
+    }
+
+    public bool MarkFaulted()
+    {
+        CancellationTokenSource? runCancellation;
+
+        lock (_syncRoot)
+        {
+            if (_status == LocalMarketStatus.Faulted)
+                return false;
+            
+            _status = LocalMarketStatus.Faulted;
+            runCancellation = _runCancellation;
+        }
+        
+        runCancellation?.Cancel();
+        return true;
     }
     
     private async Task RunLoopAsync(CancellationToken cancellationToken)
@@ -356,12 +393,18 @@ public sealed class LocalMarket
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+        catch (MarketFaultedException) when (_status == LocalMarketStatus.Faulted)
+        {
+        }
         finally
         {
             lock (_syncRoot)
             {
-                StopBots();
-                _status = LocalMarketStatus.Stopped;
+                if (_status != LocalMarketStatus.Faulted)
+                {
+                    StopBots();
+                    _status = LocalMarketStatus.Stopped;
+                }
             }
         }
     }
@@ -438,7 +481,14 @@ public sealed class LocalMarket
     {
         lock (_syncRoot)
         {
+            ThrowIfFaulted();
             return func();
         }
+    }
+
+    private void ThrowIfFaulted()
+    {
+        if (_status == LocalMarketStatus.Faulted)
+            throw new MarketFaultedException();
     }
 }
