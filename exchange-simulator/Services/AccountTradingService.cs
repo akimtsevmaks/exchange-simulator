@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using exchange_simulator.Enums;
 using exchange_simulator.Models;
 using exchange_simulator.Models.AccountTrading;
@@ -257,6 +258,30 @@ public sealed class AccountTradingService
         RecordCancellationHistory(cancelledOrder);
         return result;
     }
+
+    internal IReadOnlyList<OrderSnapshot> ApplyRestartPolicy()
+    {
+        var activeOrders = _tradingEngine.GetActiveOrders()
+            .OrderBy(order => order.CreatedAt)
+            .ThenBy(order => order.Id).ToArray();
+        
+        ValidateRestartReservations(activeOrders);
+
+        var cancelledOrders = new List<OrderSnapshot>(activeOrders.Length);
+
+        foreach (var activeOrder in activeOrders)
+        {
+            var result = CancelOrder(activeOrder.Id);
+
+            if (!result.IsSuccess || result.Trades.Count != 0 ||
+                result.Order is not { OrderStatus: OrderStatus.Cancelled } cancelledOrder)
+                throw new InvalidOperationException($"Restart cancellation failed for active order {activeOrder.Id}");
+            
+            cancelledOrders.Add(cancelledOrder);
+        }
+        
+        return cancelledOrders.ToArray();
+    }
     
     public bool TryGetAccount(Guid accountId, out TradingAccountSnapshot? snapshot)
     {
@@ -377,6 +402,49 @@ public sealed class AccountTradingService
             account.ReleaseCash(reservedCash);
         if (reservedInstruments > 0)
             account.ReleaseInstruments(reservedInstruments);
+    }
+
+    private void ValidateRestartReservations(IReadOnlyList<OrderSnapshot> activeOrders)
+    {
+        var reservedCashByAccount = new Dictionary<Guid, decimal>();
+        var reservedInstrumentsByAccount = new Dictionary<Guid, long>();
+
+        foreach (var order in activeOrders)
+        {
+            GetAccount(order.OwnerId);
+
+            if (order.OrderSide == OrderSide.Buy)
+            {
+                var price = order.Price ??
+                            throw new InvalidOperationException(
+                                $"Active buy order {order.Id} must have a limit price");
+                
+                var reservation = checked(price * order.RemainingSize);
+                var currentReservation = reservedCashByAccount.GetValueOrDefault(order.OwnerId);
+                
+                reservedCashByAccount[order.OwnerId] = checked(currentReservation + reservation);
+            }
+            else
+            {
+                var currentReservation = reservedInstrumentsByAccount.GetValueOrDefault(order.OwnerId);
+                
+                reservedInstrumentsByAccount[order.OwnerId] = checked(currentReservation + order.RemainingSize);
+            }
+        }
+
+        foreach (var account in _accounts.Values)
+        {
+            var expectedCash = reservedCashByAccount.GetValueOrDefault(account.Id);
+            var expectedInstruments = reservedInstrumentsByAccount.GetValueOrDefault(account.Id);
+            
+            if (account.ReservedCash != expectedCash)
+                throw new InvalidOperationException(
+                    $"Account {account.Id} cash reserve does not match its active orders");
+
+            if (account.Position.ReservedQuantity != expectedInstruments)
+                throw new InvalidOperationException(
+                    $"Account {account.Id} instrument reserve does not match its active orders");
+        }
     }
     
     private static void ReleaseUnusedMarketReservation(

@@ -254,6 +254,17 @@ public sealed class LocalMarket
 
     public OrderCommandResult CancelOrder(Guid orderId) =>
         Execute(() => _accountTradingService.CancelOrder(orderId));
+
+    public IReadOnlyList<OrderSnapshot> ApplyRestartPolicy()
+    {
+        lock (_syncRoot)
+        {
+            if (_status != LocalMarketStatus.Created)
+                throw new InvalidOperationException("Restart policy can be applied only before the market starts");
+            
+            return _accountTradingService.ApplyRestartPolicy();
+        }
+    }
     
     public OrderBookSnapshot GetOrderBookSnapshot() =>
         Execute(() => _accountTradingService.GetOrderBookSnapshot());
