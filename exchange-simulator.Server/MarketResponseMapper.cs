@@ -48,6 +48,7 @@ internal static class MarketResponseMapper
             LocalMarketStatus.Created => ContractMarketStatus.Created,
             LocalMarketStatus.Running => ContractMarketStatus.Running,
             LocalMarketStatus.Stopped => ContractMarketStatus.Stopped,
+            LocalMarketStatus.Faulted => ContractMarketStatus.Faulted,
             _ => throw new InvalidOperationException($"Unknown {nameof(LocalMarketStatus)}: {status}")
         };
 }

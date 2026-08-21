@@ -4,5 +4,6 @@ public enum MarketStatus
 {
     Created,
     Running,
-    Stopped
+    Stopped,
+    Faulted
 }

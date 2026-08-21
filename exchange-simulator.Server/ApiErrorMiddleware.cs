@@ -1,4 +1,5 @@
 using exchange_simulator.Contracts;
+using exchange_simulator.Services;
 
 namespace exchange_simulator.Server;
 
@@ -18,6 +19,18 @@ internal sealed class ApiErrorMiddleware(RequestDelegate next, ILogger<ApiErrorM
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
             throw;
+        }
+        catch (MarketFaultedException)
+        {
+            if (context.Response.HasStarted)
+                throw;
+            
+            context.Response.Clear();
+
+            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable,
+                new ApiErrorResponse(
+                    "MarketUnavailable",
+                    "The market is unavailable until the server is restarted"));
         }
         catch (BadHttpRequestException exception)
         {
@@ -90,6 +103,10 @@ internal sealed class ApiErrorMiddleware(RequestDelegate next, ILogger<ApiErrorM
                 new ApiErrorResponse(
                     "InternalServerError",
                     "An internal server error occurred"),
+            StatusCodes.Status503ServiceUnavailable => 
+                new ApiErrorResponse(
+                    "MarketUnavailable",
+                    "The market is unavailable until the server is restarted"),
             _ => null
         };
 
