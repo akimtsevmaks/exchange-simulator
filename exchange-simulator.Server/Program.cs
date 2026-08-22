@@ -29,7 +29,7 @@ builder.Services.AddDbContext<ExchangeDbContext>(options =>
         throw new InvalidOperationException(
             "Connection string 'ExchangeDatabase' is not configured")));
 
-builder.Services.AddSingleton(CreateMarket());
+builder.Services.AddSingleton<LocalMarket>(_ => CreateMarket());
 builder.Services.AddSingleton<TestParticipant>();
 builder.Services.AddHostedService<LocalMarketHostedService>();
 
