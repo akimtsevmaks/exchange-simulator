@@ -1,5 +1,6 @@
 using exchange_simulator.Enums;
 using exchange_simulator.Models.TradingCore;
+using exchange_simulator.Models;
 
 namespace exchange_simulator.Models.AccountTrading;
 
@@ -120,7 +121,7 @@ public class TradingAccount
             0,
             null,
             null,
-            DateTimeOffset.UtcNow);
+            UtcTimestamp.Now());
         
         _operations.Add(operation);
         CashBalance = newBalance;
@@ -141,7 +142,7 @@ public class TradingAccount
             quantity,
             null,
             null,
-            DateTimeOffset.UtcNow);
+            UtcTimestamp.Now());
         
         Position.GrantInitialQuantity(quantity, _initialInstrumentPrice);
         _operations.Add(operation);

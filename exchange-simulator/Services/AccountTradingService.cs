@@ -501,7 +501,7 @@ public sealed class AccountTradingService
                 order.FilledSize,
                 order.RemainingSize,
                 null,
-                DateTimeOffset.UtcNow);
+                UtcTimestamp.Now());
         }
         else if (order.OrderStatus == OrderStatus.Cancelled)
         {
@@ -511,7 +511,7 @@ public sealed class AccountTradingService
                 order.FilledSize,
                 order.RemainingSize,
                 null,
-                DateTimeOffset.UtcNow);
+                UtcTimestamp.Now());
         }
     }
 
@@ -545,7 +545,7 @@ public sealed class AccountTradingService
             order.FilledSize,
             order.RemainingSize,
             null,
-            DateTimeOffset.UtcNow);
+            UtcTimestamp.Now());
 
     private void AddHistoryEntry(
         Guid orderId,

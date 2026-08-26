@@ -1,4 +1,5 @@
 using exchange_simulator.Enums;
+using exchange_simulator.Models;
 
 namespace exchange_simulator.Models.TradingCore;
 
@@ -20,7 +21,7 @@ public class Order
     public long FilledSize => Size - RemainingSize;
     
     public Order(Guid ownerId, OrderType type, OrderSide side, Instrument instrument, long size, decimal? price = null)
-        : this(Guid.NewGuid(), DateTimeOffset.UtcNow, ownerId, type, side, instrument, size, size, OrderStatus.Created, price) { }
+        : this(Guid.NewGuid(), UtcTimestamp.Now(), ownerId, type, side, instrument, size, size, OrderStatus.Created, price) { }
 
     private Order(
         Guid id,

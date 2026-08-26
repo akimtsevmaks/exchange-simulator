@@ -1,5 +1,6 @@
 using exchange_simulator.Enums;
 using System.Numerics;
+using exchange_simulator.Models;
 
 namespace exchange_simulator.Models.TradingCore;
 
@@ -154,7 +155,7 @@ public class OrderBook
         var buyOrderId = incomingOrder.Side == OrderSide.Buy ? incomingOrder.Id : restingOrder.Id;
         var sellOrderId = incomingOrder.Side == OrderSide.Sell ? incomingOrder.Id : restingOrder.Id;
         
-        return new Trade(Guid.NewGuid(), Instrument.Id, buyOrderId, sellOrderId, price, size, DateTimeOffset.UtcNow);
+        return new Trade(Guid.NewGuid(), Instrument.Id, buyOrderId, sellOrderId, price, size, UtcTimestamp.Now());
     }
 
     private void RemoveFilledOrder(SortedDictionary<decimal, PriceLevel> levels,
