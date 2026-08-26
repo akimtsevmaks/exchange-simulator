@@ -4,8 +4,6 @@ using System.Text.Json.Serialization;
 using exchange_simulator.Server.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-using exchange_simulator.Bots;
-using exchange_simulator.Models.TradingCore;
 using exchange_simulator.Server;
 using exchange_simulator.Services;
 
@@ -29,7 +27,10 @@ builder.Services.AddDbContext<ExchangeDbContext>(options =>
         throw new InvalidOperationException(
             "Connection string 'ExchangeDatabase' is not configured")));
 
-builder.Services.AddSingleton<LocalMarket>(_ => CreateMarket());
+builder.Services.AddSingleton<LocalMarketFactory>();
+
+builder.Services.AddSingleton<LocalMarket>(services =>
+    services.GetRequiredService<LocalMarketFactory>().CreateNew());
 builder.Services.AddSingleton<TestParticipant>();
 builder.Services.AddHostedService<LocalMarketHostedService>();
 
@@ -42,27 +43,3 @@ app.MapPersonalAccountEndpoints();
 app.MapTradingCommandEndpoints();
 
 app.Run();
-
-static LocalMarket CreateMarket()
-{
-    var instrument = new Instrument(
-        Guid.NewGuid(),
-        "TEST",
-        "Test Instrument",
-        lotSize: 1,
-        initialPrice: 100m);
-
-    return new LocalMarket(
-        instrument,
-        initialCashPerAccount: 100000m,
-        initialInstrumentsPerAccount: 1000,
-        stepInterval: TimeSpan.FromSeconds(1),
-        marketMakerOptions: new MarketMakerBotOptions(
-            QuoteOffset: 1m,
-            OrderSize: 10),
-        noiseBotOptions: new NoiseBotOptions(
-            RandomSeed: 111,
-            PriceOffset: 3m,
-            MaxOrderLots: 5,
-            MaxActiveOrders: 20));
-}
