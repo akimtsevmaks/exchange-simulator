@@ -1,5 +1,7 @@
 using System.Data;
+using exchange_simulator.Server.Persistence;
 using exchange_simulator.Services;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -7,25 +9,32 @@ namespace exchange_simulator.Server;
 
 
 internal sealed class LocalMarketHostedService(
-    IServiceProvider services,
+    LocalMarketFactory marketFactory,
+    LocalMarketAccessor marketAccessor,
     IConfiguration configuration,
-    ILogger<LocalMarketHostedService> logger) : IHostedService
+    ILogger<LocalMarketHostedService> logger,
+    ILogger<TradingWorldStore> tradingWorldStoreLogger) : IHostedService
 {
     private const int AdvisoryLockNamespace = 0x45584348;
     private const int AdvisoryLockResource = 1;
     private const int LockCommandTimeoutSeconds = 5;
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(5);
 
-    private readonly IServiceProvider _services = services;
+    private readonly LocalMarketFactory _marketFactory = marketFactory;
+    private readonly LocalMarketAccessor _marketAccessor = marketAccessor;
     private readonly IConfiguration _configuration = configuration;
     private readonly ILogger<LocalMarketHostedService> _logger = logger;
+    private readonly ILogger<TradingWorldStore> _tradingWorldStoreLogger = tradingWorldStoreLogger;
     private readonly Lock _lifecycleSync = new();
+    private readonly SemaphoreSlim _lockCommandSync = new(1, 1);
 
     private NpgsqlConnection? _lockConnection;
     private LocalMarket? _market;
     private CancellationTokenSource? _monitorCancellation;
     private Task? _monitorTask;
     private bool _isStopping;
+    private bool _lockLost;
+    private bool _startupCompleted;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -35,14 +44,13 @@ internal sealed class LocalMarketHostedService(
             _configuration.GetConnectionString("ExchangeDatabase") ??
             throw new InvalidOperationException(
                 "Connection string 'ExchangeDatabase' is not configured");
-
         var lockConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
         {
             Pooling = false,
             ApplicationName = "exchange-simulator-single-instance-lock"
         }.ConnectionString;
-
         var connection = new NpgsqlConnection(lockConnectionString);
+        CancellationTokenSource? startupCancellation = null;
 
         try
         {
@@ -56,15 +64,53 @@ internal sealed class LocalMarketHostedService(
             }
 
             _lockConnection = connection;
+            startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-            var market = _services.GetRequiredService<LocalMarket>();
-            _market = market;
-            await market.StartAsync(cancellationToken);
+            var dbContextOptions =
+                new DbContextOptionsBuilder<ExchangeDbContext>()
+                    .UseNpgsql(connection, contextOwnsConnection: false)
+                    .Options;
+            LocalMarket market;
+
+            await using (var dbContext = new ExchangeDbContext(dbContextOptions))
+            {
+                var store = new TradingWorldStore(
+                    dbContext,
+                    _marketFactory,
+                    _tradingWorldStoreLogger);
+                market = await store.LoadOrCreateAsync(
+                    startupCancellation.Token);
+            }
 
             _monitorCancellation = new CancellationTokenSource();
             _monitorTask = MonitorLockConnectionAsync(
                 connection,
+                startupCancellation,
                 _monitorCancellation.Token);
+            await CheckLockConnectionAsync(
+                connection,
+                startupCancellation.Token);
+            startupCancellation.Token.ThrowIfCancellationRequested();
+            _market = market;
+            await market.StartAsync(startupCancellation.Token);
+            startupCancellation.Token.ThrowIfCancellationRequested();
+
+            lock (_lifecycleSync)
+            {
+                startupCancellation.Token.ThrowIfCancellationRequested();
+
+                if (_lockLost)
+                {
+                    throw new InvalidOperationException(
+                        "The PostgreSQL single-instance lock was lost during startup");
+                }
+
+                _marketAccessor.Publish(market);
+                _startupCompleted = true;
+            }
+
+            startupCancellation.Dispose();
+            startupCancellation = null;
 
             _logger.LogInformation(
                 "Acquired the PostgreSQL single-instance lock and started the local market");
@@ -82,15 +128,21 @@ internal sealed class LocalMarketHostedService(
             {
                 if (_monitorTask is not null)
                     await _monitorTask;
-
-                if (_market is not null)
-                    await _market.StopAsync();
             }
             finally
             {
-                _monitorCancellation?.Dispose();
-                await connection.DisposeAsync();
-                _lockConnection = null;
+                try
+                {
+                    if (_market is not null)
+                        await _market.StopAsync();
+                }
+                finally
+                {
+                    startupCancellation?.Dispose();
+                    _monitorCancellation?.Dispose();
+                    await connection.DisposeAsync();
+                    _lockConnection = null;
+                }
             }
 
             throw;
@@ -145,18 +197,19 @@ internal sealed class LocalMarketHostedService(
 
     private async Task MonitorLockConnectionAsync(
         NpgsqlConnection connection,
+        CancellationTokenSource startupCancellation,
         CancellationToken cancellationToken)
     {
         try
         {
             using var timer = new PeriodicTimer(HeartbeatInterval);
 
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (true)
             {
-                await using var command = connection.CreateCommand();
-                command.CommandText = "SELECT 1";
-                command.CommandTimeout = LockCommandTimeoutSeconds;
-                await command.ExecuteScalarAsync(cancellationToken);
+                await CheckLockConnectionAsync(connection, cancellationToken);
+
+                if (!await timer.WaitForNextTickAsync(cancellationToken))
+                    break;
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -164,18 +217,47 @@ internal sealed class LocalMarketHostedService(
         }
         catch (Exception exception)
         {
+            LocalMarket? market;
+            bool startupInProgress;
+
             lock (_lifecycleSync)
             {
                 if (_isStopping)
                     return;
 
-                _market?.MarkFaulted();
+                _lockLost = true;
+                startupInProgress = !_startupCompleted;
+                market = _market;
             }
+
+            if (startupInProgress)
+                startupCancellation.Cancel();
+
+            market?.MarkFaulted();
 
             _logger.LogCritical(
                 exception,
                 "The PostgreSQL connection holding the single-instance lock was lost; " +
                 "the local market is now faulted until server restart");
+        }
+    }
+
+    private async Task CheckLockConnectionAsync(
+        NpgsqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await _lockCommandSync.WaitAsync(cancellationToken);
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1";
+            command.CommandTimeout = LockCommandTimeoutSeconds;
+            await command.ExecuteScalarAsync(cancellationToken);
+        }
+        finally
+        {
+            _lockCommandSync.Release();
         }
     }
 
@@ -194,9 +276,7 @@ internal sealed class LocalMarketHostedService(
                 await using var command = CreateLockCommand(
                     connection,
                     "SELECT pg_advisory_unlock(@namespace, @resource)");
-
-                var released =
-                    await command.ExecuteScalarAsync(cancellationToken) is true;
+                var released = await command.ExecuteScalarAsync(cancellationToken) is true;
 
                 if (!released)
                 {
@@ -205,8 +285,7 @@ internal sealed class LocalMarketHostedService(
                 }
             }
         }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception exception)
@@ -229,17 +308,14 @@ internal sealed class LocalMarketHostedService(
         var command = connection.CreateCommand();
         command.CommandText = commandText;
         command.CommandTimeout = LockCommandTimeoutSeconds;
-
         command.Parameters.AddWithValue(
             "namespace",
             NpgsqlDbType.Integer,
             AdvisoryLockNamespace);
-
         command.Parameters.AddWithValue(
             "resource",
             NpgsqlDbType.Integer,
             AdvisoryLockResource);
-
         return command;
     }
 }

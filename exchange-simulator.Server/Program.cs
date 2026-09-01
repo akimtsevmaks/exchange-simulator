@@ -28,9 +28,11 @@ builder.Services.AddDbContext<ExchangeDbContext>(options =>
             "Connection string 'ExchangeDatabase' is not configured")));
 
 builder.Services.AddSingleton<LocalMarketFactory>();
+builder.Services.AddSingleton<LocalMarketAccessor>();
 
 builder.Services.AddSingleton<LocalMarket>(services =>
-    services.GetRequiredService<LocalMarketFactory>().CreateNew());
+    services.GetRequiredService<LocalMarketAccessor>().Market);
+
 builder.Services.AddSingleton<TestParticipant>();
 builder.Services.AddHostedService<LocalMarketHostedService>();
 
