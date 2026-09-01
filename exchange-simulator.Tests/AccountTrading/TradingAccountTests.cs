@@ -75,9 +75,9 @@ public class TradingAccountTests : AccountTradingServiceTestBase
         var account = new TradingAccount(accountId, GetAccountTestInstrument());
 
         // Act
-        var before = DateTimeOffset.UtcNow;
+        var before = UtcTimestamp.Now();
         var operation = account.GrantInitialCash(1000m);
-        var after = DateTimeOffset.UtcNow;
+        var after = UtcTimestamp.Now();
 
         // Assert
         Assert.NotEqual(Guid.Empty, operation.Id);
@@ -152,9 +152,9 @@ public class TradingAccountTests : AccountTradingServiceTestBase
         var account = new TradingAccount(accountId, instrument);
 
         // Act
-        var before = DateTimeOffset.UtcNow;
+        var before = UtcTimestamp.Now();
         var operation = account.GrantInitialInstruments(20);
-        var after = DateTimeOffset.UtcNow;
+        var after = UtcTimestamp.Now();
 
         // Assert
         Assert.NotEqual(Guid.Empty, operation.Id);
