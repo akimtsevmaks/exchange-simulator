@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TestMarket = exchange_simulator.Services.LocalMarket;
 
@@ -56,6 +57,9 @@ internal sealed class ExchangeServerFactory : WebApplicationFactory<LocalMarketH
         {
             services.RemoveAll<TestMarket>();
             services.AddSingleton(Market);
+            
+            services.RemoveAll<IHostedService>();
+            services.AddHostedService<TestLocalMarketHostedService>();
         });
     }
     
@@ -120,4 +124,13 @@ internal sealed class ObservableTradingBot(TestMarket market) : ITradingBot
         foreach (var order in _market.GetActiveOrders(AccountId))
             _market.CancelOrder(order.Id);
     }
+}
+
+internal sealed class TestLocalMarketHostedService(TestMarket market) : IHostedService
+{
+    public Task StartAsync(CancellationToken token) =>
+        market.StartAsync(token);
+
+    public Task StopAsync(CancellationToken token) =>
+        market.StopAsync();
 }
